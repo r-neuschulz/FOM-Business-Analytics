@@ -149,5 +149,5 @@ For downloading the full dataset (35,000+ files):
 
 ## Licenses:
 
-[BASt](https://www.bast.de/): The data provided form bast can be used freely and is subject to the "Creative Commons Attribution - 4.0 International" (CC BY 4.0).
-[OpenWeatherMap API](https://openweathermap.org/api): This project uses OpenWeatherMap API data under a commercial license agreement with OpenWeather Ltd. The license grants non-exclusive, non-transferable rights for internal usage and distribution of non-retrievable value-added services. Users must provide attribution to OpenWeatherMap in their products or services. The complete license terms are available in the "OpenWeatherAPI License Agreement.pdf" file in this repository.
+- [BASt](https://www.bast.de/): The data provided form bast can be used freely and is subject to the "Creative Commons Attribution - 4.0 International" (CC BY 4.0).
+- [OpenWeatherMap API](https://openweathermap.org/api): This project uses OpenWeatherMap API data under a commercial license agreement with OpenWeather Ltd. The license grants non-exclusive, non-transferable rights for internal usage and distribution of non-retrievable value-added services. Users must provide attribution to OpenWeatherMap in their products or services. The complete license terms are available in the "OpenWeatherAPI License Agreement.pdf" file in this repository.

@@ -12,7 +12,7 @@ from pathlib import Path
 
 def run_script(script_path, args=None):
     """
-    Run a Python script with optional arguments
+    Run a Python script with optional arguments and forward stdout in real-time
     
     Args:
         script_path (str): Path to the Python script
@@ -27,13 +27,12 @@ def run_script(script_path, args=None):
             cmd.extend(args)
         
         print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        print("-" * 60)
         
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print("STDERR:", result.stderr)
-            
+        # Run script with real-time stdout forwarding
+        result = subprocess.run(cmd, check=True, text=True, bufsize=1, universal_newlines=True)
+        
+        print("-" * 60)
         return True
         
     except subprocess.CalledProcessError as e:
