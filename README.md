@@ -34,8 +34,56 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 ### Setup Instructions
 
 1. Clone this repository
-2. Install required dependencies
+2. Install required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 3. Configure your `.env` file with your OpenWeatherMap API key
+
+### Running the BASt Data Pipeline
+
+The main application (`app.py`) provides a complete pipeline for retrieving and visualizing BASt (German Federal Highway Research Institute) traffic counting station data.
+
+#### Basic Usage
+
+To run the complete BASt data processing pipeline:
+
+```bash
+python app.py
+```
+
+This will:
+1. Retrieve BASt traffic counting station coordinates from 2003-2023 (skipping existing files)
+2. Generate visualizations including:
+   - Heatmap of station locations across Germany
+   - Year-by-year comparison of station counts
+
+#### Fresh Data Retrieval
+
+To force re-download of all BASt HTML files and regenerate the coordinate data:
+
+```bash
+python app.py --fresh
+```
+
+#### Generated Outputs
+
+The pipeline creates the following files:
+- `BASt Files/bast_locations.csv` - Coordinate data for all traffic counting stations
+- `Graphs/bast_locations_heatmap.png` - Heatmap visualization with Germany borders
+- `Graphs/bast_stations_by_year.png` - Bar chart showing station counts by year
+
+#### Individual Scripts
+
+You can also run the individual components separately:
+
+```bash
+# Retrieve coordinates only
+python 01_GetBastCoords.py [--fresh]
+
+# Generate visualizations only
+python 02_DrawBastLocations.py
+```
 
 ## Licenses:
 
