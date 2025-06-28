@@ -186,7 +186,25 @@ def main():
                        help='Number of URLs to process before taking a longer break (default: 20)')
     parser.add_argument('--batch-delay', type=int, default=10,
                        help='Seconds to wait between batches (default: 10)')
+    parser.add_argument('--city', choices=['cologne', 'berlin'], 
+                       help='Filter stations by city coordinates (cologne or berlin)')
     args = parser.parse_args()
+    
+    # City coordinate boundaries
+    city_boundaries = {
+        'cologne': {
+            'min_lat': 50.83222498154889,
+            'max_lat': 51.02000941119971,
+            'min_lon': 6.772774889455155,
+            'max_lon': 7.098966411977884
+        },
+        'berlin': {
+            'min_lat': 52.3407949019091,
+            'max_lat': 52.72708690928127,
+            'min_lon': 13.11075075837016,
+            'max_lon': 13.823930000417983
+        }
+    }
     
     # Configuration based on test mode
     if args.test:
@@ -218,13 +236,34 @@ def main():
     df = pd.read_csv(csv_path)
     
     # Check if required columns exist
-    required_columns = ['year', 'station_number']
+    required_columns = ['year', 'station_number', 'x_coordinate', 'y_coordinate']
     missing_columns = [col for col in required_columns if col not in df.columns]
     
     if missing_columns:
         print(f"Error: Missing columns in CSV: {missing_columns}")
         print(f"Available columns: {list(df.columns)}")
         return
+    
+    # Apply city filtering if specified
+    if args.city:
+        boundaries = city_boundaries[args.city]
+        print(f"Filtering stations for {args.city.title()}...")
+        print(f"  Latitude range: {boundaries['min_lat']:.6f} to {boundaries['max_lat']:.6f}")
+        print(f"  Longitude range: {boundaries['min_lon']:.6f} to {boundaries['max_lon']:.6f}")
+        
+        # Filter by coordinates (x_coordinate is longitude, y_coordinate is latitude)
+        df = df[
+            (df['y_coordinate'] >= boundaries['min_lat']) & 
+            (df['y_coordinate'] <= boundaries['max_lat']) & 
+            (df['x_coordinate'] >= boundaries['min_lon']) & 
+            (df['x_coordinate'] <= boundaries['max_lon'])
+        ]
+        
+        print(f"Found {len(df)} stations in {args.city.title()} area")
+        
+        if len(df) == 0:
+            print(f"No stations found in {args.city.title()} area. Exiting.")
+            return
     
     # Create output directory if it doesn't exist
     output_dir = Path("BASt Hourly Data")

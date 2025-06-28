@@ -130,6 +130,8 @@ def main():
                        help='Seconds to wait between batches (default: 10)')
     parser.add_argument('--skip-hourly', action='store_true',
                        help='Skip hourly data download step')
+    parser.add_argument('--city', choices=['cologne', 'berlin'],
+                       help='Filter stations by city coordinates (cologne or berlin)')
     
     args = parser.parse_args()
     
@@ -199,6 +201,8 @@ def main():
                 hourly_args.extend(["--batch-size", str(args.batch_size)])
             if args.batch_delay != 10:
                 hourly_args.extend(["--batch-delay", str(args.batch_delay)])
+            if args.city:
+                hourly_args.extend(["--city", args.city])
             
             if not run_script(hourly_script, hourly_args):
                 if termination_requested:
@@ -216,6 +220,8 @@ def main():
         
         print("\n" + "=" * 40)
         print("BASt Business Analytics Pipeline completed successfully!")
+        if args.city:
+            print(f"City filter applied: {args.city.title()}")
         print("\nGenerated files:")
         print("- BASt Station Files/bast_locations.csv (coordinate data)")
         print("- Graphs/bast_locations_heatmap.png (heatmap visualization)")
