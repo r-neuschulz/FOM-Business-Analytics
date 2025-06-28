@@ -37,3 +37,10 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 2. Install required dependencies
 3. Configure your `.env` file with your OpenWeatherMap API key
 
+## Licenses:
+
+Bast: Für die hier frei zur Verfügung gestellten Daten gilt die „Creative Commons Namensnennung - 4.0 International“ (CC BY 4.0).
+
+    Creative Commons Namensnennung - 4.0 International
+
+OpenWeatherMap API: 
