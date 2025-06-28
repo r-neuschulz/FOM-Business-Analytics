@@ -4,7 +4,7 @@ This repository contains materials and resources for the Business Analytics pres
 
 ## Project Overview
 
-We're correlating pollution data from OpenWeatherMap with traffic data to potentially guide policymakers, traffic planners, and urban development strategies. This analysis aims to provide insights into the relationship between environmental factors and transportation patterns.
+We're correlating pollution data from OpenWeatherMap with traffic data from BASt to potentially guide policymakers,inform traffic planners, and enable data-driven urban development strategies. This analysis aims to provide insights into the relationship between environmental factors and transportation patterns.
 
 ## Course Information
 - **Institution**: FOM Hochschule
@@ -15,7 +15,7 @@ We're correlating pollution data from OpenWeatherMap with traffic data to potent
 ## Contents
 - Script for reference
 - Instructions on how to run the BA Scripts
-- Data analysis tools and methodologies
+- Pre-generated Plots
 - Documentation and findings
 
 ## Getting Started
@@ -42,7 +42,11 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 
 ### Running the BASt Data Pipeline
 
-The main application (`app.py`) provides a complete pipeline for retrieving, visualizing, and downloading BASt (German Federal Highway Research Institute) traffic counting station data.
+The main application (`app.py`) provides a complete pipeline for retrieving, visualizing, and downloading all data. By default, it is reducing the BASt data to Cologne, Berlin, and Düsseldorf. Ad of 2025-06-24 this will download 1076 years worth of hourly data for 51 distinct stations (1.5 GB of Data). The Germany-wide download consumes roughly 70 GB across more than 35.000 years worth of data.
+
+As of 2025-06-24, that data is available up to, and including 2023.
+
+If run with an educational OpenWeatherMap API, key 50.000 requests per day can be processed. It includes pollution data up starting on the 2020-11-26, at hourly granularity for S02, NO2,PM10, PM2.5, O3, and CO.
 
 #### Basic Usage
 
