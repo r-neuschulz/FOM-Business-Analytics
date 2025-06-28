@@ -187,6 +187,19 @@ def main():
             print("Pipeline terminated by user after visualization creation.")
             return False
         
+        # Step 2b: Create city-by-year stacked bar visualization
+        city_viz_script = os.path.join("Helpers", "04_DrawBastLocationsByCity.py")
+        if os.path.exists(city_viz_script):
+            print("\nStep 2b: Creating city-by-year stacked bar visualization...")
+            if not run_script(city_viz_script):
+                if termination_requested:
+                    print("Pipeline terminated by user during city-by-year visualization creation.")
+                    return False
+                print("Failed to create city-by-year stacked bar visualization. Exiting.")
+                return False
+        else:
+            print(f"Warning: {city_viz_script} not found. Skipping city-by-year visualization.")
+        
         # Step 3: Download BASt station hourly data
         if not args.skip_hourly:
             print("\nStep 3: Downloading BASt station hourly data...")
