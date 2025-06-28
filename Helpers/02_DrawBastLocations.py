@@ -61,17 +61,6 @@ def create_bast_heatmap():
     
     # Create the figure and axis
     fig, ax = plt.subplots(1, 1, figsize=(16, 12))
-    
-    # Add the base map FIRST
-    print("Adding base map...")
-    try:
-        if gdf_web.crs is not None:
-            ctx.add_basemap(ax, crs=gdf_web.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik)
-        else:
-            ctx.add_basemap(ax, crs='EPSG:3857', source=ctx.providers.OpenStreetMap.Mapnik)
-    except Exception as e:
-        print(f"Warning: Could not load base map: {e}")
-        pass
 
     # Overlay German borders
     germany = gpd.read_file('Graphs/ne_10m_admin_0_countries.shp')
@@ -122,7 +111,7 @@ def create_bast_heatmap():
     heatmap = gaussian_filter(heatmap, sigma=1)
     
     # Use magma colormap instead of custom colormap
-    cmap = plt.cm.magma
+    cmap = plt.get_cmap('magma')
     
     # Plot the heatmap AFTER the base map
     extent = (x_min, x_max, y_min, y_max)
@@ -184,7 +173,7 @@ def create_year_comparison_plot():
     counts = np.array(year_counts.values)
     
     # Create magma colormap for the bars
-    cmap = plt.cm.magma
+    cmap = plt.get_cmap('magma')
     colors = cmap(np.linspace(0.2, 0.8, len(years)))
     
     # Plot the data with magma colors
