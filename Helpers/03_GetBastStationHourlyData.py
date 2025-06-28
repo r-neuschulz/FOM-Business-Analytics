@@ -187,8 +187,8 @@ def main():
                        help='Number of URLs to process before taking a longer break (default: 20)')
     parser.add_argument('--batch-delay', type=int, default=10,
                        help='Seconds to wait between batches (default: 10)')
-    parser.add_argument('--city', choices=['cologne', 'berlin'], 
-                       help='Filter stations by city coordinates (cologne or berlin)')
+    parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'], 
+                       help='Filter stations by city coordinates (cologne, berlin, or duesseldorf)')
     args = parser.parse_args()
     
     # City coordinate boundaries
@@ -204,6 +204,12 @@ def main():
             'max_lat': 52.72708690928127,
             'min_lon': 13.11075075837016,
             'max_lon': 13.823930000417983
+        },
+        'duesseldorf': {
+            'min_lat': 51.1219059201905,
+            'max_lat': 51.346932771684,
+            'min_lon': 6.689240012533243,
+            'max_lon': 6.928627403474891
         }
     }
     

@@ -130,8 +130,8 @@ def main():
                        help='Seconds to wait between batches (default: 10)')
     parser.add_argument('--skip-hourly', action='store_true',
                        help='Skip hourly data download step')
-    parser.add_argument('--city', choices=['cologne', 'berlin'],
-                       help='Filter stations by city coordinates (cologne or berlin)')
+    parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'],
+                       help='Filter stations by city coordinates (cologne, berlin, or duesseldorf)')
     
     args = parser.parse_args()
     
