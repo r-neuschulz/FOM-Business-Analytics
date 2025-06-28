@@ -42,7 +42,7 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 
 ### Running the BASt Data Pipeline
 
-The main application (`app.py`) provides a complete pipeline for retrieving and visualizing BASt (German Federal Highway Research Institute) traffic counting station data.
+The main application (`app.py`) provides a complete pipeline for retrieving, visualizing, and downloading BASt (German Federal Highway Research Institute) traffic counting station data.
 
 #### Basic Usage
 
@@ -57,14 +57,63 @@ This will:
 2. Generate visualizations including:
    - Heatmap of station locations across Germany
    - Year-by-year comparison of station counts
+3. Download and extract hourly traffic data from BASt servers
 
-#### Fresh Data Retrieval
+#### Command Line Options
 
-To force re-download of all BASt HTML files and regenerate the coordinate data:
+The pipeline supports various command line options for different use cases:
 
 ```bash
+# Force fresh data retrieval for coordinates
 python app.py --fresh
+
+# Run in test mode (limited URLs for testing)
+python app.py --test
+
+# Customize batch processing settings
+python app.py --batch-size 50 --batch-delay 30
+
+# Skip hourly data download
+python app.py --skip-hourly
+
+# Combine options
+python app.py --fresh --test --batch-size 100
 ```
+
+#### Test Mode
+
+For testing or development purposes, use the `--test` flag:
+
+```bash
+python app.py --test
+```
+
+This will:
+- Limit URL checking to 20 BASt Station URLs
+- Limit downloads to 5 files
+- Perfect for testing the pipeline without overwhelming the servers
+
+#### Batch Processing
+
+For large-scale downloads (35,000+ files), you can customize batch processing:
+
+```bash
+# Conservative approach (smaller batches, longer delays)
+python app.py --batch-size 50 --batch-delay 60
+
+# Aggressive approach (larger batches, shorter delays)
+python app.py --batch-size 200 --batch-delay 15
+```
+
+#### Download Strategy
+
+The pipeline includes robust download measures:
+- **Immediate first attempts** for maximum speed
+- **Exponential backoff** with jitter for failed requests
+- **User agent rotation** across 5 different browsers
+- **Random delays** between requests (1-3 seconds)
+- **Batch processing** with configurable breaks
+- **Session management** with automatic retries
 
 #### Generated Outputs
 
@@ -72,6 +121,8 @@ The pipeline creates the following files:
 - `BASt Station Files/bast_locations.csv` - Coordinate data for all traffic counting stations
 - `Graphs/bast_locations_heatmap.png` - Heatmap visualization with Germany borders
 - `Graphs/bast_stations_by_year.png` - Bar chart showing station counts by year
+- `BASt Hourly Data/` - Directory containing extracted hourly traffic data files
+- `BASt Hourly Data/zip_file_existence_check.csv` - Download status report
 
 #### Individual Scripts
 
@@ -79,11 +130,22 @@ You can also run the individual components separately:
 
 ```bash
 # Retrieve coordinates only
-python 01_GetBastCoords.py [--fresh]
+python Helpers/01_GetBastStationGeneralData.py [--fresh]
 
 # Generate visualizations only
-python 02_DrawBastLocations.py
+python Helpers/02_DrawBastLocations.py
+
+# Download hourly data only
+python Helpers/03_GetBastStationHourlyData.py [--test] [--batch-size N] [--batch-delay N]
 ```
+
+#### Performance Considerations
+
+For downloading the full dataset (35,000+ files):
+- **Estimated time**: ~20 hours with default settings
+- **Recommended**: Run during off-peak hours (night time in Germany)
+- **Monitoring**: Watch for 429 errors (rate limiting)
+- **Resume capability**: Script skips already downloaded files
 
 ## Licenses:
 
