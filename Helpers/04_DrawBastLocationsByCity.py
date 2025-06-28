@@ -123,68 +123,16 @@ def create_city_year_stacked_bar():
     from matplotlib.patches import Patch
     from matplotlib.offsetbox import OffsetImage, AnnotationBbox
     
-    # SVG to PNG conversion function
-    def convert_svg_to_png(svg_path, png_path, height_px=50):
-        """Convert SVG to PNG with specified height and proportional width"""
-        try:
-            from svglib.svglib import svg2rlg
-            from reportlab.graphics import renderPM
-            from PIL import Image
-            import io
-            
-            # Load SVG and convert to ReportLab drawing
-            drawing = svg2rlg(svg_path)
-            
-            # Check if drawing was successfully created
-            if drawing is None:
-                print(f"Failed to load SVG: {svg_path}")
-                return None
-            
-            # Calculate proportional width based on height
-            svg_width = drawing.width
-            svg_height = drawing.height
-            aspect_ratio = svg_width / svg_height
-            width_px = int(height_px * aspect_ratio)
-            
-            # Scale the drawing to the desired size
-            drawing.scale(width_px/svg_width, height_px/svg_height)
-            
-            # Convert to PNG
-            png_data = io.BytesIO()
-            renderPM.drawToFile(drawing, png_data, fmt="PNG")
-            png_data.seek(0)
-            
-            # Save to file
-            img = Image.open(png_data)
-            img.save(png_path)
-            
-            return png_path
-            
-        except ImportError:
-            print("svglib not installed. Install with: pip install svglib reportlab")
-            return None
-        except Exception as e:
-            print(f"Error converting SVG {svg_path}: {e}")
-            return None
-    
-    # Convert SVG logos to PNG if they don't exist
+    # Check for existing PNG logo files
     logo_png_files = {}
     for city in cities:
-        svg_path = f"Graphs/Logo_{city}.svg"
-        png_path = f"Graphs/Logo_{city}_50px.png"
+        png_path = f"Graphs/Logo_{city}.png"
         
-        if os.path.exists(svg_path):
-            if not os.path.exists(png_path):
-                print(f"Converting {svg_path} to {png_path}...")
-                convert_svg_to_png(svg_path, png_path, height_px=50)
-            
-            if os.path.exists(png_path):
-                logo_png_files[city] = png_path
-                print(f"Logo ready: {png_path}")
-            else:
-                print(f"Failed to convert logo for {city}")
+        if os.path.exists(png_path):
+            logo_png_files[city] = png_path
+            print(f"Found logo: {png_path}")
         else:
-            print(f"SVG logo not found: {svg_path}")
+            print(f"PNG logo not found: {png_path}")
     
     # Load PNG logos for legend
     def load_png_logo(png_path):
