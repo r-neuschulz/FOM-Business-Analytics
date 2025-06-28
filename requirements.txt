@@ -7,6 +7,4 @@ shapely==2.0.2
 scipy==1.11.4
 pyproj==3.6.1
 contextily==1.4.0
-svglib==1.5.1
-reportlab==4.0.7
 Pillow==10.1.0
