@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from pyproj import Transformer
 
 # User agents to rotate through
 USER_AGENTS = [
@@ -244,6 +245,26 @@ def main():
         print(f"Available columns: {list(df.columns)}")
         return
     
+    # Convert coordinates to numeric, handling any non-numeric values
+    df['x_coordinate'] = pd.to_numeric(df['x_coordinate'], errors='coerce')
+    df['y_coordinate'] = pd.to_numeric(df['y_coordinate'], errors='coerce')
+    
+    # Remove rows with invalid coordinates
+    df = df.dropna(subset=['x_coordinate', 'y_coordinate'])
+    print(f"Valid coordinates: {len(df)} locations")
+    
+    # Convert coordinates from EPSG:25832 (ETRS89 / UTM zone 32N) to EPSG:4326 (WGS84 decimal degrees)
+    transformer = Transformer.from_crs("EPSG:25832", "EPSG:4326", always_xy=True)
+    
+    # Convert coordinates to decimal degrees
+    lons, lats = transformer.transform(df['x_coordinate'].values, df['y_coordinate'].values)
+    df['longitude'] = lons
+    df['latitude'] = lats
+    
+    print(f"Coordinate conversion completed. Sample coordinates:")
+    print(f"  Original (EPSG:25832): X={df['x_coordinate'].iloc[0]:.0f}, Y={df['y_coordinate'].iloc[0]:.0f}")
+    print(f"  Converted (WGS84): Lon={df['longitude'].iloc[0]:.6f}, Lat={df['latitude'].iloc[0]:.6f}")
+    
     # Apply city filtering if specified
     if args.city:
         boundaries = city_boundaries[args.city]
@@ -251,12 +272,12 @@ def main():
         print(f"  Latitude range: {boundaries['min_lat']:.6f} to {boundaries['max_lat']:.6f}")
         print(f"  Longitude range: {boundaries['min_lon']:.6f} to {boundaries['max_lon']:.6f}")
         
-        # Filter by coordinates (x_coordinate is longitude, y_coordinate is latitude)
+        # Filter by coordinates using converted decimal degrees
         df = df[
-            (df['y_coordinate'] >= boundaries['min_lat']) & 
-            (df['y_coordinate'] <= boundaries['max_lat']) & 
-            (df['x_coordinate'] >= boundaries['min_lon']) & 
-            (df['x_coordinate'] <= boundaries['max_lon'])
+            (df['latitude'] >= boundaries['min_lat']) & 
+            (df['latitude'] <= boundaries['max_lat']) & 
+            (df['longitude'] >= boundaries['min_lon']) & 
+            (df['longitude'] <= boundaries['max_lon'])
         ]
         
         print(f"Found {len(df)} stations in {args.city.title()} area")
