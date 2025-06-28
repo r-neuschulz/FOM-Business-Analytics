@@ -123,7 +123,7 @@ def main():
     parser.add_argument('--fresh', action='store_true', 
                        help='Force fresh data retrieval for coordinates')
     parser.add_argument('--test', action='store_true', 
-                       help='Run hourly data download in test mode (limited URLs)')
+                       help='Run hourly data download in test mode (limited URLs and downloads)')
     parser.add_argument('--batch-size', type=int, default=20,
                        help='Number of URLs to process before taking a longer break (default: 20)')
     parser.add_argument('--batch-delay', type=int, default=10,
@@ -131,6 +131,7 @@ def main():
     parser.add_argument('--skip-hourly', action='store_true',
                        help='Skip hourly data download step')
     parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'], nargs='+',
+                       default=['cologne', 'berlin', 'duesseldorf'],
                        help='Filter stations by city coordinates (can specify multiple: cologne, berlin, duesseldorf)')
     parser.add_argument('--workers', type=int, default=5,
                        help='Number of parallel download workers (default: 5)')

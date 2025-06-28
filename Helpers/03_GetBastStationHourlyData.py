@@ -100,6 +100,19 @@ def check_zip_file_exists(url, max_retries=6, base_delay=1):
     
     return False
 
+def safe_remove_file(file_path):
+    """
+    Safely remove a file with proper error handling for file access issues.
+    """
+    try:
+        if file_path.exists():
+            file_path.unlink()
+            return True
+    except (OSError, PermissionError) as e:
+        # File might be in use or already deleted, which is fine
+        return False
+    return True
+
 def download_and_extract_zip(url, output_dir, station_number, year, max_retries=6, base_delay=1):
     """
     Download a zip file from the given URL and immediately extract it to the output directory.
@@ -108,13 +121,15 @@ def download_and_extract_zip(url, output_dir, station_number, year, max_retries=
     """
     session = create_session()
     
+    # Create unique temporary zip file path
+    timestamp = int(time.time() * 1000)  # milliseconds
+    random_suffix = random.randint(1000, 9999)
+    temp_zip_path = output_dir / f"temp_zst{station_number}_{year}_{timestamp}_{random_suffix}.zip"
+    
     # First attempt - immediate, no delay
     try:
         response = session.get(url, timeout=30, stream=True)
         response.raise_for_status()
-        
-        # Create temporary zip file path
-        temp_zip_path = output_dir / f"temp_zst{station_number}_{year}.zip"
         
         # Download zip file to temporary location
         with open(temp_zip_path, 'wb') as f:
@@ -159,26 +174,22 @@ def download_and_extract_zip(url, output_dir, station_number, year, max_retries=
                 return "not_zip"
             else:
                 print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
-                if temp_zip_path.exists():
-                    temp_zip_path.unlink()
+                temp_zip_path.unlink()
                 return False
         except Exception as e:
             print(f"Unexpected error extracting zst{station_number}_{year}: {e}")
-            if temp_zip_path.exists():
-                temp_zip_path.unlink()
+            temp_zip_path.unlink()
             return False
             
     except requests.RequestException as e:
         print(f"First download attempt failed for {url}: {e}")
+        temp_zip_path.unlink()
     
     # Subsequent attempts with backoff
     for attempt in range(max_retries):
         try:
             response = session.get(url, timeout=30, stream=True)
             response.raise_for_status()
-            
-            # Create temporary zip file path
-            temp_zip_path = output_dir / f"temp_zst{station_number}_{year}.zip"
             
             # Download zip file to temporary location
             with open(temp_zip_path, 'wb') as f:
@@ -223,18 +234,17 @@ def download_and_extract_zip(url, output_dir, station_number, year, max_retries=
                     return "not_zip"
                 else:
                     print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
-                    if temp_zip_path.exists():
-                        temp_zip_path.unlink()
+                    temp_zip_path.unlink()
                     return False
             except Exception as e:
                 print(f"Unexpected error extracting zst{station_number}_{year}: {e}")
-                if temp_zip_path.exists():
-                    temp_zip_path.unlink()
+                temp_zip_path.unlink()
                 return False
                 
         except requests.RequestException as e:
             if attempt == max_retries - 1:
                 print(f"Error downloading {url} after {max_retries + 1} attempts: {e}")
+                temp_zip_path.unlink()
                 return False
             
             delay = base_delay * (2 ** attempt) + random.uniform(0, 1)  # Add jitter
@@ -276,15 +286,26 @@ def process_station_download(row_data, output_dir, max_files_to_download, downlo
                 print(f"Downloading and extracting: zst{station_number}_{year} ({city})")
                 result = download_and_extract_zip(url, output_dir, station_number, year)
                 if result == True:
-                    downloaded = True
-                    downloaded_counter.increment()
+                    # Verify that the CSV file was actually created
+                    if (output_dir / csv_filename).exists():
+                        downloaded = True
+                        downloaded_counter.increment()
                 elif result == "not_zip":
-                    not_zip_file = True
-                    downloaded_counter.increment()
+                    # Verify that the not_zip file was actually created
+                    if (output_dir / not_zip_filename).exists():
+                        downloaded = True
+                        not_zip_file = True
+                        downloaded_counter.increment()
             else:
                 print(f"Extracted files already exist locally: zst{station_number}_{year} ({city})")
-                downloaded = True
-                downloaded_counter.increment()
+                # Check which type of file actually exists
+                if (output_dir / not_zip_filename).exists():
+                    downloaded = True
+                    not_zip_file = True
+                    downloaded_counter.increment()
+                elif (output_dir / csv_filename).exists():
+                    downloaded = True
+                    downloaded_counter.increment()
     
     return {
         'year': year,
