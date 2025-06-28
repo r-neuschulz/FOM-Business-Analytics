@@ -58,10 +58,10 @@ def main():
     
     # Step 1: Get BASt coordinates
     print("\nStep 1: Retrieving BASt coordinates...")
-    bast_coords_script = "01_GetBastCoords.py"
+    bast_coords_script = os.path.join("Helpers", "01_GetBastCoords.py")
     
     if not os.path.exists(bast_coords_script):
-        print(f"Error: {bast_coords_script} not found in current directory")
+        print(f"Error: {bast_coords_script} not found.")
         return False
     
     # Prepare arguments for coordinate retrieval
@@ -73,10 +73,10 @@ def main():
     
     # Step 2: Create visualizations
     print("\nStep 2: Creating visualizations...")
-    viz_script = "02_DrawBastLocations.py"
+    viz_script = os.path.join("Helpers", "02_DrawBastLocations.py")
     
     if not os.path.exists(viz_script):
-        print(f"Error: {viz_script} not found in current directory")
+        print(f"Error: {viz_script} not found.")
         return False
     
     if not run_script(viz_script):

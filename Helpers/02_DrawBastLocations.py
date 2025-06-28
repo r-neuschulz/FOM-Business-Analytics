@@ -8,7 +8,7 @@ from shapely.geometry import Point
 import warnings
 import os
 from pyproj import Transformer
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, NullLocator
 warnings.filterwarnings('ignore')
 
 def create_bast_heatmap():
@@ -19,10 +19,10 @@ def create_bast_heatmap():
     
     # Load the BASt locations data
     try:
-        df = pd.read_csv('BASt Files/bast_locations.csv')
+        df = pd.read_csv('BASt Station Files/bast_locations.csv')
         print(f"Loaded {len(df)} locations")
     except FileNotFoundError:
-        print("Error: bast_locations.csv not found in BASt Files directory")
+        print("Error: bast_locations.csv not found in BASt Station Files directory")
         return
     
     # Convert coordinates to numeric, handling any non-numeric values
@@ -70,22 +70,55 @@ def create_bast_heatmap():
 
     # Formatter for axis ticks (Web Mercator to lon/lat)
     transformer = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
-    def format_lon(x, pos):
-        lon, _ = transformer.transform(x, y_min)
-        deg = int(lon)
-        min_ = int(abs((lon - deg) * 60))
-        return f"{deg}°{min_}'"
-    def format_lat(y, pos):
-        _, lat = transformer.transform(x_min, y)
-        deg = int(lat)
-        min_ = int(abs((lat - deg) * 60))
-        return f"{deg}°{min_}'"
-    ax.xaxis.set_major_formatter(FuncFormatter(format_lon))
-    ax.yaxis.set_major_formatter(FuncFormatter(format_lat))
-
-    # Set axis limits to match the heatmap extent
+    
+    # Set axis limits to match the heatmap extent (actual data bounds with padding)
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
+
+    # Add longitude and latitude gridlines at 1° increments within the data bounds
+    lon_min, lat_min = transformer.transform(x_min, y_min)
+    lon_max, lat_max = transformer.transform(x_max, y_max)
+
+    # Only use full degree ticks within the data bounds
+    lon_ticks = np.arange(np.ceil(lon_min), np.floor(lon_max) + 1, 1)
+    lat_ticks = np.arange(np.ceil(lat_min), np.floor(lat_max) + 1, 1)
+
+    # Convert back to Web Mercator for plotting
+    lon_grid_x = []
+    lat_grid_y = []
+    transformer_reverse = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    for lon in lon_ticks:
+        x, _ = transformer_reverse.transform(lon, lat_min)
+        lon_grid_x.append(x)
+    for lat in lat_ticks:
+        _, y = transformer_reverse.transform(lon_min, lat)
+        lat_grid_y.append(y)
+
+    # Add vertical lines (longitude)
+    for x in lon_grid_x:
+        if x_min <= x <= x_max:
+            ax.axvline(x=x, color='grey', alpha=0.5, linewidth=0.5, zorder=5)
+    # Add horizontal lines (latitude)
+    for y in lat_grid_y:
+        if y_min <= y <= y_max:
+            ax.axhline(y=y, color='grey', alpha=0.5, linewidth=0.5, zorder=5)
+
+    # Set tick marks and labels for the gridlines (only at full degrees)
+    ax.set_xticks(lon_grid_x)
+    ax.set_yticks(lat_grid_y)
+    def format_lon_tick(x, pos):
+        lon, _ = transformer.transform(x, y_min)
+        return f"{lon:.0f}°"
+    def format_lat_tick(y, pos):
+        _, lat = transformer.transform(x_min, y)
+        return f"{lat:.0f}°"
+    ax.xaxis.set_major_formatter(FuncFormatter(format_lon_tick))
+    ax.yaxis.set_major_formatter(FuncFormatter(format_lat_tick))
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+    # Remove minor ticks and gridlines
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.grid(False)
 
     # Plot the points with a heatmap effect
     print("Creating heatmap...")
@@ -160,7 +193,7 @@ def create_year_comparison_plot():
     print("Creating year comparison plot...")
     
     # Load the data
-    df = pd.read_csv('BASt Files/bast_locations.csv')
+    df = pd.read_csv('BASt Station Files/bast_locations.csv')
     
     # Count stations by year
     year_counts = df['year'].value_counts().sort_index()

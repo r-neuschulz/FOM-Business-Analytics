@@ -69,7 +69,7 @@ python app.py --fresh
 #### Generated Outputs
 
 The pipeline creates the following files:
-- `BASt Files/bast_locations.csv` - Coordinate data for all traffic counting stations
+- `BASt Station Files/bast_locations.csv` - Coordinate data for all traffic counting stations
 - `Graphs/bast_locations_heatmap.png` - Heatmap visualization with Germany borders
 - `Graphs/bast_stations_by_year.png` - Bar chart showing station counts by year
 

@@ -102,8 +102,8 @@ def get_bast_locations():
     # Check for --fresh parameter
     fresh_download = '--fresh' in sys.argv
     
-    # Create BASt Files directory if it doesn't exist
-    bast_files_dir = "BASt Files"
+    # Create BASt Station Files directory if it doesn't exist
+    bast_files_dir = "BASt Station Files"
     if not os.path.exists(bast_files_dir):
         os.makedirs(bast_files_dir)
         print(f"Created directory: {bast_files_dir}")
