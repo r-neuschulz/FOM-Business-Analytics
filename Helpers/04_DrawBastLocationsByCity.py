@@ -4,6 +4,8 @@ import numpy as np
 import warnings
 import os
 from pathlib import Path
+
+from matplotlib.patches import Rectangle
 warnings.filterwarnings('ignore')
 
 def create_city_year_stacked_bar():
@@ -61,14 +63,19 @@ def create_city_year_stacked_bar():
     # Create the figure and axis
     fig, ax = plt.subplots(1, 1, figsize=(16, 10))
     
-    # Define colors for each city
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    # Define specific colors for the three cities
+    city_colors = {
+        'berlin': '#000000',
+        'duesseldorf': '#3c74b9', 
+        'cologne': '#e1141c'
+    }
     
     # Create stacked bar chart
     bottom = np.zeros(len(pivot_data))
     
     for i, city in enumerate(cities):
-        color = colors[i % len(colors)]
+        # Use specific color if available, otherwise use default
+        color = city_colors.get(city, '#1f77b4')
         values = pivot_data[city]
         
         # Create bars for this city
@@ -104,9 +111,140 @@ def create_city_year_stacked_bar():
     ax.grid(True, axis='y', alpha=0.3, linestyle='--')
     ax.set_axisbelow(True)
     
-    # Add legend
-    ax.legend(title='Cities', title_fontsize=12, fontsize=11, 
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Create Graphs directory if it doesn't exist
+    graphs_dir = Path("Graphs")
+    graphs_dir.mkdir(exist_ok=True)
+    print(f"Ensured directory exists: {graphs_dir}")
+    
+    # Create custom legend with colors and logos
+    from matplotlib.patches import Patch
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    
+    # SVG to PNG conversion function
+    def convert_svg_to_png(svg_path, png_path, height_px=50):
+        """Convert SVG to PNG with specified height and proportional width"""
+        try:
+            from svglib.svglib import svg2rlg
+            from reportlab.graphics import renderPM
+            from PIL import Image
+            import io
+            
+            # Load SVG and convert to ReportLab drawing
+            drawing = svg2rlg(svg_path)
+            
+            # Check if drawing was successfully created
+            if drawing is None:
+                print(f"Failed to load SVG: {svg_path}")
+                return None
+            
+            # Calculate proportional width based on height
+            svg_width = drawing.width
+            svg_height = drawing.height
+            aspect_ratio = svg_width / svg_height
+            width_px = int(height_px * aspect_ratio)
+            
+            # Scale the drawing to the desired size
+            drawing.scale(width_px/svg_width, height_px/svg_height)
+            
+            # Convert to PNG
+            png_data = io.BytesIO()
+            renderPM.drawToFile(drawing, png_data, fmt="PNG")
+            png_data.seek(0)
+            
+            # Save to file
+            img = Image.open(png_data)
+            img.save(png_path)
+            
+            return png_path
+            
+        except ImportError:
+            print("svglib not installed. Install with: pip install svglib reportlab")
+            return None
+        except Exception as e:
+            print(f"Error converting SVG {svg_path}: {e}")
+            return None
+    
+    # Convert SVG logos to PNG if they don't exist
+    logo_png_files = {}
+    for city in cities:
+        svg_path = f"Graphs/Logo_{city}.svg"
+        png_path = f"Graphs/Logo_{city}_50px.png"
+        
+        if os.path.exists(svg_path):
+            if not os.path.exists(png_path):
+                print(f"Converting {svg_path} to {png_path}...")
+                convert_svg_to_png(svg_path, png_path, height_px=50)
+            
+            if os.path.exists(png_path):
+                logo_png_files[city] = png_path
+                print(f"Logo ready: {png_path}")
+            else:
+                print(f"Failed to convert logo for {city}")
+        else:
+            print(f"SVG logo not found: {svg_path}")
+    
+    # Load PNG logos for legend
+    def load_png_logo(png_path):
+        """Load PNG logo as numpy array"""
+        try:
+            import matplotlib.image as mpimg
+            return mpimg.imread(png_path)
+        except Exception as e:
+            print(f"Error loading PNG {png_path}: {e}")
+            return None
+    
+    # Create simple legend for main plot with logos
+    legend_handles = []
+    legend_labels = []
+    
+    for city in cities:
+        color = city_colors.get(city, '#1f77b4')
+        legend_patch = Patch(color=color, label=city.title())
+        legend_handles.append(legend_patch)
+        legend_labels.append(city.title())
+    
+    # Add legend to main plot
+    ax.legend(handles=legend_handles, labels=legend_labels, title='Cities', title_fontsize=12, fontsize=11, 
              loc='upper left', bbox_to_anchor=(1, 1))
+    
+    # Create a separate legend with logos
+    logo_fig, logo_ax = plt.subplots(figsize=(10, 3))
+    logo_ax.axis('off')
+    
+    # Position logos horizontally
+    logo_width = 0.25
+    spacing = 0.33
+    
+    for i, city in enumerate(cities):
+        color = city_colors.get(city, '#1f77b4')
+        x_pos = 0.05 + i * spacing
+        
+        # Create color patch
+        logo_ax.add_patch(Rectangle((x_pos, 0.3), logo_width, 0.4, color=color, edgecolor='black', linewidth=2))
+        
+        # Try to load and add logo
+        png_path = logo_png_files.get(city)
+        if png_path:
+            img_array = load_png_logo(png_path)
+            if img_array is not None:
+                # Add logo above color patch
+                logo_box = OffsetImage(img_array, zoom=0.3)
+                ab = AnnotationBbox(logo_box, (x_pos + logo_width/2, 0.8), 
+                                  frameon=False, box_alignment=(0.5, 0.5))
+                logo_ax.add_artist(ab)
+        
+        # Add city name below color patch
+        logo_ax.text(x_pos + logo_width/2, 0.15, city.title(), 
+                    fontsize=14, va='center', ha='center', fontweight='bold')
+    
+    # Save logo legend
+    logo_legend_file = graphs_dir / 'city_logo_legend.png'
+    logo_fig.savefig(logo_legend_file, dpi=300, bbox_inches='tight', transparent=True)
+    plt.close(logo_fig)
+    print(f"Logo legend saved to: {logo_legend_file}")
     
     # Add some statistics as text
     total_stations = len(df)
@@ -124,14 +262,6 @@ def create_city_year_stacked_bar():
     
     ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
-    
-    # Adjust layout to prevent label cutoff
-    plt.tight_layout()
-    
-    # Create Graphs directory if it doesn't exist
-    graphs_dir = Path("Graphs")
-    graphs_dir.mkdir(exist_ok=True)
-    print(f"Ensured directory exists: {graphs_dir}")
     
     # Save the plot
     output_file = graphs_dir / 'bast_locations_by_year_by_city.png'
