@@ -110,10 +110,19 @@ def download_and_extract_zip(url, output_dir, station_number, year, max_retries=
             return True
             
         except zipfile.BadZipFile as e:
-            print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
-            if temp_zip_path.exists():
-                temp_zip_path.unlink()
-            return False
+            error_msg = str(e)
+            if "File is not a zip file" in error_msg:
+                # Save the non-zip file as-is
+                non_zip_filename = f"zst{station_number}_{year}_not_zip"
+                non_zip_path = output_dir / non_zip_filename
+                temp_zip_path.rename(non_zip_path)
+                print(f"Saved non-zip file: {non_zip_filename}")
+                return "not_zip"
+            else:
+                print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
+                if temp_zip_path.exists():
+                    temp_zip_path.unlink()
+                return False
             
     except requests.RequestException as e:
         print(f"First download attempt failed for {url}: {e}")
@@ -143,10 +152,19 @@ def download_and_extract_zip(url, output_dir, station_number, year, max_retries=
                 return True
                 
             except zipfile.BadZipFile as e:
-                print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
-                if temp_zip_path.exists():
-                    temp_zip_path.unlink()
-                return False
+                error_msg = str(e)
+                if "File is not a zip file" in error_msg:
+                    # Save the non-zip file as-is
+                    non_zip_filename = f"zst{station_number}_{year}_not_zip"
+                    non_zip_path = output_dir / non_zip_filename
+                    temp_zip_path.rename(non_zip_path)
+                    print(f"Saved non-zip file: {non_zip_filename}")
+                    return "not_zip"
+                else:
+                    print(f"Error extracting zip file for zst{station_number}_{year}: {e}")
+                    if temp_zip_path.exists():
+                        temp_zip_path.unlink()
+                    return False
                 
         except requests.RequestException as e:
             if attempt == max_retries - 1:
@@ -241,6 +259,7 @@ def main():
         
         # Download if exists and within download limit
         downloaded = False
+        not_zip_file = False
         if exists:
             if MAX_FILES_TO_DOWNLOAD and downloaded_count >= MAX_FILES_TO_DOWNLOAD:
                 print(f"Skipping download (limit reached): zst{station_number}_{year}")
@@ -250,8 +269,12 @@ def main():
                 
                 if not extracted_files_exist:
                     print(f"Downloading and extracting: zst{station_number}_{year}")
-                    downloaded = download_and_extract_zip(url, output_dir, station_number, year)
-                    if downloaded:
+                    result = download_and_extract_zip(url, output_dir, station_number, year)
+                    if result == True:
+                        downloaded = True
+                        downloaded_count += 1
+                    elif result == "not_zip":
+                        not_zip_file = True
                         downloaded_count += 1
                 else:
                     print(f"Extracted files already exist locally: zst{station_number}_{year}")
@@ -263,7 +286,8 @@ def main():
             'station_number': station_number,
             'url': url,
             'exists': exists,
-            'downloaded': downloaded
+            'downloaded': downloaded,
+            'not_zip_file': not_zip_file
         })
         
         # Add random delay between requests
@@ -287,11 +311,13 @@ def main():
     
     # Print summary
     existing_files = results_df['exists'].sum()
+    not_zip_files = results_df['not_zip_file'].sum()
     print(f"\nSummary:")
     print(f"Total BASt Station URLs checked: {checked_count}")
     print(f"Files found: {existing_files}")
     print(f"Files not found: {checked_count - existing_files}")
     print(f"Files downloaded and extracted: {downloaded_count}")
+    print(f"Non-zip files saved: {not_zip_files}")
     if args.test:
         print(f"Test mode limits: {MAX_URLS_TO_CHECK} URLs checked, {MAX_FILES_TO_DOWNLOAD} downloads max")
     print(f"Results saved to: {output_file}")
