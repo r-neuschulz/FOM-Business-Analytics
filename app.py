@@ -86,7 +86,7 @@ def main():
     print("\n" + "=" * 40)
     print("BASt Business Analytics Pipeline completed successfully!")
     print("\nGenerated files:")
-    print("- BASt Files/bast_locations.csv (coordinate data)")
+    print("- BASt Station Files/bast_locations.csv (coordinate data)")
     print("- Graphs/bast_locations_heatmap.png (heatmap visualization)")
     print("- Graphs/bast_stations_by_year.png (year comparison)")
     
