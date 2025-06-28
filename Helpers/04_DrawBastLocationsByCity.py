@@ -4,8 +4,11 @@ import numpy as np
 import warnings
 import os
 from pathlib import Path
+import matplotlib.image as mpimg
 
 from matplotlib.patches import Rectangle
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox, AuxTransformBox, VPacker, HPacker, TextArea
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredOffsetbox
 warnings.filterwarnings('ignore')
 
 def create_city_year_stacked_bar():
@@ -121,7 +124,6 @@ def create_city_year_stacked_bar():
     
     # Create custom legend with colors and logos
     from matplotlib.patches import Patch
-    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
     
     # Check for existing PNG logo files
     logo_png_files = {}
@@ -134,65 +136,26 @@ def create_city_year_stacked_bar():
         else:
             print(f"PNG logo not found: {png_path}")
     
-    # Load PNG logos for legend
-    def load_png_logo(png_path):
-        """Load PNG logo as numpy array"""
-        try:
-            import matplotlib.image as mpimg
-            return mpimg.imread(png_path)
-        except Exception as e:
-            print(f"Error loading PNG {png_path}: {e}")
-            return None
-    
-    # Create simple legend for main plot with logos
-    legend_handles = []
-    legend_labels = []
-    
-    for city in cities:
-        color = city_colors.get(city, '#1f77b4')
-        legend_patch = Patch(color=color, label=city.title())
-        legend_handles.append(legend_patch)
-        legend_labels.append(city.title())
-    
-    # Add legend to main plot
-    ax.legend(handles=legend_handles, labels=legend_labels, title='Cities', title_fontsize=12, fontsize=11, 
-             loc='upper left', bbox_to_anchor=(1, 1))
-    
     # Create a separate legend with logos
-    logo_fig, logo_ax = plt.subplots(figsize=(10, 3))
-    logo_ax.axis('off')
+    boxes = []
+    for city in cities:
+        # Bar
+        bar_box = AuxTransformBox(ax.transData)
+        bar_patch = Rectangle((0,0), 0.6, 3.3, color=city_colors[city], alpha=0.8)
+        bar_box.add_artist(bar_patch)
+        # Logo
+        if city in logo_png_files:
+            img = mpimg.imread(logo_png_files[city])
+            logo_box = OffsetImage(img, zoom=0.45, alpha=0.8)
+        else:
+            logo_box = TextArea(city.title())
+        # Combine bar and logo
+        pair = HPacker(children=[bar_box, logo_box], align='center', pad=0, sep=10)
+        boxes.append(pair)
     
-    # Position logos horizontally
-    logo_width = 0.25
-    spacing = 0.33
-    
-    for i, city in enumerate(cities):
-        color = city_colors.get(city, '#1f77b4')
-        x_pos = 0.05 + i * spacing
-        
-        # Create color patch
-        logo_ax.add_patch(Rectangle((x_pos, 0.3), logo_width, 0.4, color=color, edgecolor='black', linewidth=2))
-        
-        # Try to load and add logo
-        png_path = logo_png_files.get(city)
-        if png_path:
-            img_array = load_png_logo(png_path)
-            if img_array is not None:
-                # Add logo above color patch
-                logo_box = OffsetImage(img_array, zoom=0.3)
-                ab = AnnotationBbox(logo_box, (x_pos + logo_width/2, 0.8), 
-                                  frameon=False, box_alignment=(0.5, 0.5))
-                logo_ax.add_artist(ab)
-        
-        # Add city name below color patch
-        logo_ax.text(x_pos + logo_width/2, 0.15, city.title(), 
-                    fontsize=14, va='center', ha='center', fontweight='bold')
-    
-    # Save logo legend
-    logo_legend_file = graphs_dir / 'city_logo_legend.png'
-    logo_fig.savefig(logo_legend_file, dpi=300, bbox_inches='tight', transparent=True)
-    plt.close(logo_fig)
-    print(f"Logo legend saved to: {logo_legend_file}")
+    legend_box = HPacker(children=boxes, align='center', pad=0, sep=50)
+    anchored_box = AnchoredOffsetbox(loc='lower center', child=legend_box, pad=0.5, frameon=False, bbox_to_anchor=(0.5, -0.18), bbox_transform=ax.transAxes, borderpad=0.)
+    ax.add_artist(anchored_box)
     
     # Add some statistics as text
     total_stations = len(df)
