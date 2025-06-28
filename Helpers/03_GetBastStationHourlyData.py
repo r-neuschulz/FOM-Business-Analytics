@@ -223,7 +223,10 @@ def main():
         total_urls = min(total_urls, MAX_URLS_TO_CHECK)
         df = df.head(MAX_URLS_TO_CHECK)
     
-    print(f"Checking {total_urls} BASt Station URLs...")
+    # Reverse the DataFrame to process from most recent to oldest data
+    df = df.iloc[::-1].reset_index(drop=True)
+    
+    print(f"Checking {total_urls} BASt Station URLs (most recent data first)...")
     
     for counter, (index, row) in enumerate(df.iterrows(), 1):
         year = row['year']
