@@ -62,11 +62,16 @@ def create_bast_heatmap():
     # Create the figure and axis
     fig, ax = plt.subplots(1, 1, figsize=(16, 12))
 
-    # Overlay German borders
-    germany = gpd.read_file('Graphs/ne_10m_admin_0_countries.shp')
-    germany = germany[germany['NAME'] == 'Germany']
-    germany = germany.to_crs(epsg=3857)
-    germany.boundary.plot(ax=ax, color='white', linewidth=2, alpha=0.5, zorder=10)
+    # Overlay German borders (optional - skip if file not found or fiona issues)
+    try:
+        germany = gpd.read_file('Graphs/ne_10m_admin_0_countries.shp')
+        germany = germany[germany['NAME'] == 'Germany']
+        germany = germany.to_crs(epsg=3857)
+        germany.boundary.plot(ax=ax, color='white', linewidth=2, alpha=0.5, zorder=10)
+        print("Added German border overlay")
+    except Exception as e:
+        print(f"Warning: Could not load German border shapefile: {e}")
+        print("Continuing without border overlay...")
 
     # Formatter for axis ticks (Web Mercator to lon/lat)
     transformer = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)

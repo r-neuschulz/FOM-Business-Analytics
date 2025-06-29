@@ -49,6 +49,8 @@ def main():
     parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'], nargs='+',
                        default=['cologne', 'berlin', 'duesseldorf'],
                        help='Filter stations by city coordinates (default: all three cities)')
+    parser.add_argument('--test', action='store_true',
+                       help='Test mode: skip actual downloads, only create city mapping')
     args = parser.parse_args()
     
     # City coordinate boundaries
@@ -158,6 +160,37 @@ def main():
         if len(df) == 0:
             print(f"No stations found in any of the specified city areas. Exiting.")
             return
+    else:
+        # No city filtering specified, but still create city mapping for all stations
+        print("No city filtering specified. Creating city mapping for all stations...")
+        
+        # Initialize city column
+        df['city'] = 'unknown'
+        
+        # Apply city boundaries to categorize all stations
+        for city, boundaries in city_boundaries.items():
+            print(f"  {city.title()}: Lat {boundaries['min_lat']:.6f}-{boundaries['max_lat']:.6f}, Lon {boundaries['min_lon']:.6f}-{boundaries['max_lon']:.6f}")
+            
+            city_filter = (
+                (df['latitude'] >= boundaries['min_lat']) & 
+                (df['latitude'] <= boundaries['max_lat']) & 
+                (df['longitude'] >= boundaries['min_lon']) & 
+                (df['longitude'] <= boundaries['max_lon'])
+            )
+            
+            # Mark stations belonging to this city
+            df.loc[city_filter, 'city'] = city
+        
+        # Print summary by city
+        print(f"\nStations found by city:")
+        for city in city_boundaries.keys():
+            city_count = len(df[df['city'] == city])
+            print(f"  {city.title()}: {city_count} stations")
+        
+        unknown_count = len(df[df['city'] == 'unknown'])
+        print(f"  Unknown/Other: {unknown_count} stations")
+        
+        print(f"\nTotal stations: {len(df)}")
     
     # Create output directory if it doesn't exist
     output_dir = Path("BASt Hourly Data")
@@ -167,97 +200,123 @@ def main():
     results = []
     total_stations = len(df)
     
-    print(f"\nProcessing {total_stations} stations sequentially...")
-    
-    for i, (_, row) in enumerate(df.iterrows()):
-        year = int(row['year'])
-        station_number = int(row['station_number'])
-        city = str(row.get('city', 'unknown'))
+    if args.test:
+        print(f"\nTest mode: Skipping actual downloads for {total_stations} stations")
+        print("Creating city mapping file only...")
         
-        # Generate URL
-        url = f"https://www.bast.de/videos/{year}/zst{station_number}.zip"
-        
-        print(f"[{i + 1}/{total_stations}] Processing zst{station_number}_{year} ({city})")
-        
-        # Check if files already exist
-        csv_filename = f"zst{station_number}_{year}.csv"
-        not_zip_filename = f"zst{station_number}_{year}_not_zip"
-        
-        if (output_dir / csv_filename).exists():
-            print(f"  CSV file already exists, skipping")
-            results.append({
-                'year': year,
-                'station_number': station_number,
-                'url': url,
-                'exists': True,
-                'downloaded': True,
-                'not_zip_file': False,
-                'city': city
-            })
-            continue
+        # Create dummy results for test mode
+        for i, (_, row) in enumerate(df.iterrows()):
+            year = int(row['year'])
+            station_number = int(row['station_number'])
+            city = str(row.get('city', 'unknown'))
             
-        if (output_dir / not_zip_filename).exists():
-            print(f"  Non-zip file already exists, skipping")
             results.append({
                 'year': year,
                 'station_number': station_number,
-                'url': url,
-                'exists': True,
-                'downloaded': True,
-                'not_zip_file': True,
-                'city': city
-            })
-            continue
-        
-        # Download and extract
-        result = download_and_extract_zip(url, output_dir, station_number, year)
-        
-        if result == True:
-            results.append({
-                'year': year,
-                'station_number': station_number,
-                'url': url,
-                'exists': True,
-                'downloaded': True,
-                'not_zip_file': False,
-                'city': city
-            })
-        elif result == "not_zip":
-            results.append({
-                'year': year,
-                'station_number': station_number,
-                'url': url,
-                'exists': True,
-                'downloaded': True,
-                'not_zip_file': True,
-                'city': city
-            })
-        else:
-            results.append({
-                'year': year,
-                'station_number': station_number,
-                'url': url,
+                'url': f"https://www.bast.de/videos/{year}/zst{station_number}.zip",
                 'exists': False,
                 'downloaded': False,
                 'not_zip_file': False,
                 'city': city
             })
+    else:
+        print(f"\nProcessing {total_stations} stations sequentially...")
         
-        # Simple delay between requests
-        time.sleep(0.5)
+        for i, (_, row) in enumerate(df.iterrows()):
+            year = int(row['year'])
+            station_number = int(row['station_number'])
+            city = str(row.get('city', 'unknown'))
+            
+            # Generate URL
+            url = f"https://www.bast.de/videos/{year}/zst{station_number}.zip"
+            
+            print(f"[{i + 1}/{total_stations}] Processing zst{station_number}_{year} ({city})")
+            
+            # Check if files already exist
+            csv_filename = f"zst{station_number}_{year}.csv"
+            not_zip_filename = f"zst{station_number}_{year}_not_zip"
+            
+            if (output_dir / csv_filename).exists():
+                print(f"  CSV file already exists, skipping")
+                results.append({
+                    'year': year,
+                    'station_number': station_number,
+                    'url': url,
+                    'exists': True,
+                    'downloaded': True,
+                    'not_zip_file': False,
+                    'city': city
+                })
+                continue
+                
+            if (output_dir / not_zip_filename).exists():
+                print(f"  Non-zip file already exists, skipping")
+                results.append({
+                    'year': year,
+                    'station_number': station_number,
+                    'url': url,
+                    'exists': True,
+                    'downloaded': True,
+                    'not_zip_file': True,
+                    'city': city
+                })
+                continue
+            
+            # Download and extract
+            result = download_and_extract_zip(url, output_dir, station_number, year)
+            
+            if result == True:
+                results.append({
+                    'year': year,
+                    'station_number': station_number,
+                    'url': url,
+                    'exists': True,
+                    'downloaded': True,
+                    'not_zip_file': False,
+                    'city': city
+                })
+            elif result == "not_zip":
+                results.append({
+                    'year': year,
+                    'station_number': station_number,
+                    'url': url,
+                    'exists': True,
+                    'downloaded': True,
+                    'not_zip_file': True,
+                    'city': city
+                })
+            else:
+                results.append({
+                    'year': year,
+                    'station_number': station_number,
+                    'url': url,
+                    'exists': False,
+                    'downloaded': False,
+                    'not_zip_file': False,
+                    'city': city
+                })
+            
+            # Simple delay between requests
+            time.sleep(0.5)
     
     # Create results DataFrame and save
     results_df = pd.DataFrame(results)
     output_file = output_dir / "zip_file_existence_check.csv"
     results_df.to_csv(output_file, index=False, encoding='utf-8')
     
-    # Save city mapping if city filtering was used
-    if args.city:
-        city_mapping_file = output_dir / "bast_stations_by_city.csv"
-        selected_columns = ['year', 'station_number', 'city', 'latitude', 'longitude', 'location_name']
-        city_mapping_df = pd.DataFrame(df[selected_columns])
-        city_mapping_df.to_csv(city_mapping_file, index=False, encoding='utf-8')
-        print(f"\nStation-city assignments saved to: {city_mapping_file}")
+    # Save city mapping (always save, not just when city filtering was used)
+    city_mapping_file = output_dir / "bast_stations_by_city.csv"
+    selected_columns = ['year', 'station_number', 'city', 'latitude', 'longitude', 'location_name']
+    
+    # Ensure location_name column exists
+    if 'location_name' not in df.columns:
+        df['location_name'] = 'Unknown Location'
+    
+    # Filter to only include columns that exist in the DataFrame
+    available_columns = [col for col in selected_columns if col in df.columns]
+    city_mapping_df = pd.DataFrame(df[available_columns])
+    city_mapping_df.to_csv(city_mapping_file, index=False, encoding='utf-8')
+    print(f"\nStation-city assignments saved to: {city_mapping_file}")
     
     # Print summary
     existing_files = results_df['exists'].sum()
