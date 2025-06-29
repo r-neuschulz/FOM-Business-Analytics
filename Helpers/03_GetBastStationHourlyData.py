@@ -101,6 +101,13 @@ def main():
     df = df.dropna(subset=['x_coordinate', 'y_coordinate'])
     print(f"Valid coordinates: {len(df)} locations")
     
+    # Filter to only include stations from 2020 onwards (weather data availability)
+    df = df[df['year'] >= 2020]
+    print(f"Stations from 2020 onwards: {len(df)} locations")
+    
+    # Set df as a pandas DataFrame
+    df = pd.DataFrame(df)
+    
     # Convert coordinates from EPSG:25832 to EPSG:4326 (WGS84)
     transformer = Transformer.from_crs("EPSG:25832", "EPSG:4326", always_xy=True)
     lons, lats = transformer.transform(df['x_coordinate'].values, df['y_coordinate'].values)
