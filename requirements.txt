@@ -8,3 +8,4 @@ scipy==1.11.4
 pyproj==3.6.1
 contextily==1.4.0
 Pillow==10.1.0
+pytz==2023.3
