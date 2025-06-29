@@ -108,10 +108,10 @@ def get_bast_locations():
         os.makedirs(bast_files_dir)
         print(f"Created directory: {bast_files_dir}")
     
-    # Generate URLs for years 2003 to 2023
+    # Generate URLs for years 2003 to 2024
     base_url = "https://www.bast.de/DE/Verkehrstechnik/Fachthemen/v2-verkehrszaehlung/Daten/{year}_1/Jawe{year}.html"
     urls = []
-    for year in range(2020, 2024):
+    for year in range(2003, 2024):
         url = base_url.format(year=year)
         urls.append((year, url))
     
@@ -132,7 +132,7 @@ def get_bast_locations():
                 content = html_file.read()
         else:
             try:
-                response = requests.get(url, headers=headers, timeout=30)
+                response = requests.get(url, headers=headers, timeout=120)
                 response.raise_for_status()
                 
                 content = response.text
