@@ -124,17 +124,13 @@ def main():
                        help='Force fresh data retrieval for coordinates')
     parser.add_argument('--test', action='store_true', 
                        help='Run hourly data download in test mode (limited URLs and downloads)')
-    parser.add_argument('--batch-size', type=int, default=20,
-                       help='Number of URLs to process before taking a longer break (default: 20)')
-    parser.add_argument('--batch-delay', type=int, default=10,
-                       help='Seconds to wait between batches (default: 10)')
     parser.add_argument('--skip-hourly', action='store_true',
                        help='Skip hourly data download step')
     parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'], nargs='+',
                        default=['cologne', 'berlin', 'duesseldorf'],
                        help='Filter stations by city coordinates (can specify multiple: cologne, berlin, duesseldorf)')
-    parser.add_argument('--workers', type=int, default=5,
-                       help='Number of parallel download workers (default: 5)')
+    parser.add_argument('--workers', type=int, default=10,
+                       help='Number of parallel download workers (default: 10)')
     
     args = parser.parse_args()
     
@@ -200,13 +196,9 @@ def main():
             hourly_args = []
             if args.test:
                 hourly_args.append("--test")
-            if args.batch_size != 20:
-                hourly_args.extend(["--batch-size", str(args.batch_size)])
-            if args.batch_delay != 10:
-                hourly_args.extend(["--batch-delay", str(args.batch_delay)])
             if args.city:
                 hourly_args.extend(["--city"] + args.city)
-            if args.workers != 5:
+            if args.workers != 10:
                 hourly_args.extend(["--workers", str(args.workers)])
             
             if not run_script(hourly_script, hourly_args):

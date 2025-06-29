@@ -306,7 +306,7 @@ def main():
             pool.imap(process_csv_file, args_list),
             total=len(csv_files),
             desc="Processing files",
-            unit="file"
+            unit=" files"
         ))
     
     # Process results
@@ -315,12 +315,12 @@ def main():
             successful += 1
         elif result['status'] == 'error':
             failed += 1
-            print(f"❌ ERROR: {result['file']} - {result['message']}")
+            print(f"ERROR: {result['file']} - {result['message']}")
             if 'details' in result:
                 print(f"   Details: {result['details']}")
         elif result['status'] == 'skipped':
             skipped += 1
-            print(f"⚠️  SKIPPED: {result['file']} - {result['message']}")
+            print(f"SKIPPED: {result['file']} - {result['message']}")
     
     end_time = time.time()
     processing_time = end_time - start_time
@@ -329,17 +329,17 @@ def main():
     print("=" * 60)
     print("PROCESSING SUMMARY")
     print("=" * 60)
-    print(f"✅ Successful: {successful}")
-    print(f"❌ Failed: {failed}")
-    print(f"⚠️  Skipped: {skipped}")
-    print(f"📊 Total: {successful + failed + skipped}")
-    print(f"⏱️  Processing time: {processing_time:.2f} seconds")
-    print(f"🚀 Average time per file: {processing_time/len(csv_files):.3f} seconds")
+    print(f"SUCCESS: {successful}")
+    print(f"FAILED: {failed}")
+    print(f"SKIPPED: {skipped}")
+    print(f"TOTAL: {successful + failed + skipped}")
+    print(f"PROCESSING TIME: {processing_time:.2f} seconds")
+    print(f"AVERAGE TIME PER FILE: {processing_time/len(csv_files):.3f} seconds")
     
     if failed > 0:
-        print(f"\n⚠️  {failed} files failed to process. Check the error messages above.")
+        print(f"\nWARNING: {failed} files failed to process. Check the error messages above.")
     else:
-        print(f"\n🎉 All files processed successfully!")
+        print(f"\nSUCCESS: All files processed successfully!")
 
 if __name__ == "__main__":
     main() 

@@ -74,14 +74,14 @@ python app.py --fresh
 # Run in test mode (limited URLs for testing)
 python app.py --test
 
-# Customize batch processing settings
-python app.py --batch-size 50 --batch-delay 30
+# Customize parallel processing
+python app.py --workers 20
 
 # Skip hourly data download
 python app.py --skip-hourly
 
 # Combine options
-python app.py --fresh --test --batch-size 100
+python app.py --fresh --test --workers 15
 ```
 
 #### Test Mode
@@ -93,31 +93,34 @@ python app.py --test
 ```
 
 This will:
-- Limit URL checking to 20 BASt Station URLs
-- Limit downloads to 5 files
+- Skip actual downloads, only create city mapping
 - Perfect for testing the pipeline without overwhelming the servers
 
-#### Batch Processing
+#### Parallel Processing
 
-For large-scale downloads (35,000+ files), you can customize batch processing:
+The pipeline now uses parallel processing for much faster downloads:
 
 ```bash
-# Conservative approach (smaller batches, longer delays)
-python app.py --batch-size 50 --batch-delay 60
+# Conservative approach (fewer workers, more respectful to server)
+python app.py --workers 5
 
-# Aggressive approach (larger batches, shorter delays)
-python app.py --batch-size 200 --batch-delay 15
+# Aggressive approach (more workers, faster downloads)
+python app.py --workers 20
+
+# Default approach (balanced performance)
+python app.py --workers 10
 ```
 
 #### Download Strategy
 
 The pipeline includes robust download measures:
-- **Immediate first attempts** for maximum speed
+- **Parallel processing** with configurable number of workers
+- **Thread-safe operations** for file handling and progress tracking
 - **Exponential backoff** with jitter for failed requests
-- **User agent rotation** across 5 different browsers
-- **Random delays** between requests (1-3 seconds)
-- **Batch processing** with configurable breaks
+- **Random delays** between requests (0.1-0.3 seconds)
 - **Session management** with automatic retries
+- **Progress tracking** with real-time statistics
+- **Resume capability** - skips already downloaded files
 
 #### Generated Outputs
 
@@ -125,8 +128,11 @@ The pipeline creates the following files:
 - `BASt Station Files/bast_locations.csv` - Coordinate data for all traffic counting stations
 - `Graphs/bast_locations_heatmap.png` - Heatmap visualization with Germany borders
 - `Graphs/bast_stations_by_year.png` - Bar chart showing station counts by year
+- `Graphs/bast_locations_by_year_by_city.png` - City-by-year stacked bar visualization
+- `Graphs/bast_locations_by_city_heatmap.png` - City heatmap visualization
 - `BASt Hourly Data/` - Directory containing extracted hourly traffic data files
 - `BASt Hourly Data/zip_file_existence_check.csv` - Download status report
+- `BASt Hourly Data/bast_stations_by_city.csv` - Station-city mapping
 
 #### Individual Scripts
 
@@ -139,17 +145,25 @@ python Helpers/01_GetBastStationGeneralData.py [--fresh]
 # Generate visualizations only
 python Helpers/02_DrawBastLocations.py
 
-# Download hourly data only
-python Helpers/03_GetBastStationHourlyData.py [--test] [--batch-size N] [--batch-delay N]
+# Download hourly data only (with parallel processing)
+python Helpers/03_GetBastStationHourlyData.py [--test] [--workers N] [--city cologne berlin duesseldorf]
+
+# Create city-specific visualizations
+python Helpers/04_DrawBastLocationsByCity.py
+python Helpers/05_DrawBastLocationsByCityHeatmap.py
+
+# Format data for OpenWeather API
+python Helpers/06_FormatForOpenWeather.py
 ```
 
 #### Performance Considerations
 
 For downloading the full dataset (35,000+ files):
-- **Estimated time**: ~20 hours with default settings
-- **Recommended**: Run during off-peak hours (night time in Germany)
+- **Estimated time**: ~2-4 hours with 10 workers (vs ~20 hours sequential)
+- **Recommended**: Use 10-15 workers for optimal performance
 - **Monitoring**: Watch for 429 errors (rate limiting)
 - **Resume capability**: Script skips already downloaded files
+- **Memory usage**: ~100-200MB RAM with 10 workers
 
 ## Licenses:
 
