@@ -42,11 +42,20 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 
 ### Running the BASt Data Pipeline
 
-The main application (`app.py`) provides a complete pipeline for retrieving, visualizing, and downloading all data. By default, it is reducing the BASt data to Cologne, Berlin, and Düsseldorf. Ad of 2025-06-24 this will download 1076 years worth of hourly data for 51 distinct stations (1.5 GB of Data). The Germany-wide download consumes roughly 70 GB across more than 35.000 years worth of data.
+The main application (`app.py`) provides a complete pipeline for retrieving, visualizing, and downloading all data. By default, it filters BASt data to focus on three major German cities: Cologne, Berlin, and Düsseldorf.
 
-As of 2025-06-24, that data is available up to, and including 2023.
+**BASt Data Volume Information (as of 2025-06-24):**
+- **Default (3 cities)**: 1,076 years worth of hourly data for 51 distinct stations (approximately 1.5 GB)
+- **Germany-wide**: Over 35,000 years worth of data across all stations (approximately 70 GB)
+- **Data availability**: Traffic data available up to and including 2023
+- **Source**: Real-Life Measurements by BASt
 
-If run with an educational OpenWeatherMap API, key 50.000 requests per day can be processed. It includes pollution data up starting on the 2020-11-26, at hourly granularity for S02, NO2,PM10, PM2.5, O3, and CO.
+**OpenWeatherMap API Integration:**
+- **Educational API limit**: 50,000 requests per day
+- **Pollution data available**: Starting from 2020-11-26
+- **Pollutants tracked**: SO₂, NO₂, PM10, PM2.5, O₃, and CO
+- **Data granularity**: Hourly measurements
+- **Source**: SILAM atmospheric composition model
 
 #### Basic Usage
 
@@ -56,12 +65,15 @@ To run the complete BASt data processing pipeline:
 python app.py
 ```
 
-This will:
-1. Retrieve BASt traffic counting station coordinates from 2003-2023 (skipping existing files)
-2. Generate visualizations including:
+This will execute the following steps:
+1. **Step 1**: Retrieve BASt traffic counting station coordinates from 2003-2023 (skipping existing files)
+2. **Step 2**: Generate visualizations including:
    - Heatmap of station locations across Germany
    - Year-by-year comparison of station counts
-3. Download and extract hourly traffic data from BASt servers
+3. **Step 3**: Download and extract hourly traffic data from BASt servers
+4. **Step 3b**: Create city-by-year stacked bar visualization
+5. **Step 3c**: Create city heatmap visualization
+6. **Step 4**: Format data for OpenWeather API (creates files with Unix timestamps and location data)
 
 #### Command Line Options
 
@@ -77,12 +89,26 @@ python app.py --test
 # Customize parallel processing
 python app.py --workers 20
 
-# Skip hourly data download
+# Skip hourly data download (only creates city mapping and visualizations)
 python app.py --skip-hourly
 
+# Filter by specific cities (can specify multiple)
+python app.py --city cologne berlin
+python app.py --city berlin
+python app.py --city cologne berlin duesseldorf
+
 # Combine options
-python app.py --fresh --test --workers 15
+python app.py --fresh --test --workers 15 --city cologne berlin
 ```
+
+#### Available Cities
+
+The `--city` option accepts the following cities (can specify multiple):
+- `cologne` - Cologne area stations
+- `berlin` - Berlin area stations  
+- `duesseldorf` - Düsseldorf area stations
+
+Default behavior includes all three cities: `cologne`, `berlin`, `duesseldorf`
 
 #### Test Mode
 
@@ -94,33 +120,39 @@ python app.py --test
 
 This will:
 - Skip actual downloads, only create city mapping
-- Perfect for testing the pipeline without overwhelming the servers
+- For testing the pipeline without overwhelming the servers
+- Still generates all visualizations and city mappings
+
+#### Skip Hourly Data Mode
+
+Use the `--skip-hourly` flag to run the pipeline without downloading hourly data:
+
+```bash
+python app.py --skip-hourly
+```
+
+This will:
+- Execute Steps 1, 2, 3b, and 3c (coordinates, visualizations, city-specific visualizations)
+- Skip Step 3 (hourly data download) and Step 4 (OpenWeather formatting)
+- Create city mapping for visualization purposes only
+- Useful for quick testing or when you only need coordinate data and visualizations
 
 #### Parallel Processing
 
-The pipeline now uses parallel processing for much faster downloads:
-
 ```bash
-# Conservative approach (fewer workers, more respectful to server)
+# Conservative approach (fewer workers, usually more respectful towards providing servers)
 python app.py --workers 5
 
-# Aggressive approach (more workers, faster downloads)
-python app.py --workers 20
-
-# Default approach (balanced performance)
-python app.py --workers 10
 ```
 
-#### Download Strategy
+#### Graceful Termination
 
-The pipeline includes robust download measures:
-- **Parallel processing** with configurable number of workers
-- **Thread-safe operations** for file handling and progress tracking
-- **Exponential backoff** with jitter for failed requests
-- **Random delays** between requests (0.1-0.3 seconds)
-- **Session management** with automatic retries
-- **Progress tracking** with real-time statistics
-- **Resume capability** - skips already downloaded files
+The pipeline supports graceful termination with Ctrl+C:
+
+- Press `Ctrl+C` at any time to safely stop the pipeline
+- The script will complete the current operation and exit cleanly
+- No partial downloads or corrupted files will be left behind
+- Useful for long-running downloads that need to be interrupted
 
 #### Generated Outputs
 
@@ -133,6 +165,7 @@ The pipeline creates the following files:
 - `BASt Hourly Data/` - Directory containing extracted hourly traffic data files
 - `BASt Hourly Data/zip_file_existence_check.csv` - Download status report
 - `BASt Hourly Data/bast_stations_by_city.csv` - Station-city mapping
+- `BASt Hourly Data/*.csv` - Files with Unix timestamps and location data for OpenWeather API (Step 4 output)
 
 #### Individual Scripts
 
@@ -160,10 +193,8 @@ python Helpers/06_FormatForOpenWeather.py
 
 For downloading the full dataset (35,000+ files):
 - **Estimated time**: ~2-4 hours with 10 workers (vs ~20 hours sequential)
-- **Recommended**: Use 10-15 workers for optimal performance
 - **Monitoring**: Watch for 429 errors (rate limiting)
 - **Resume capability**: Script skips already downloaded files
-- **Memory usage**: ~100-200MB RAM with 10 workers
 
 ## Licenses:
 
