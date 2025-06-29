@@ -47,7 +47,8 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Download BASt station hourly data zip files')
     parser.add_argument('--city', choices=['cologne', 'berlin', 'duesseldorf'], nargs='+',
-                       help='Filter stations by city coordinates')
+                       default=['cologne', 'berlin', 'duesseldorf'],
+                       help='Filter stations by city coordinates (default: all three cities)')
     args = parser.parse_args()
     
     # City coordinate boundaries
@@ -101,9 +102,9 @@ def main():
     df = df.dropna(subset=['x_coordinate', 'y_coordinate'])
     print(f"Valid coordinates: {len(df)} locations")
     
-    # Filter to only include stations from 2020 onwards (weather data availability)
-    df = df[df['year'] >= 2020]
-    print(f"Stations from 2020 onwards: {len(df)} locations")
+    # Filter to only include stations from 2003 onwards (weather data availability starts from 2020)
+    df = df[df['year'] >= 2003]
+    print(f"Stations from 2003 onwards: {len(df)} locations")
     
     # Set df as a pandas DataFrame
     df = pd.DataFrame(df)
