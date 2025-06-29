@@ -7,16 +7,19 @@ dates and hours to Unix timestamps for OpenWeather API compatibility.
 
 The script:
 1. Reads all zst*.csv files in the BASt Hourly Data directory
-2. Converts "Datum" (YYMMDD) and "Stunde" (HH) to Unix timestamps
-3. Creates UnixStart (hour beginning - 1 hour) and UnixEnd (hour ending - 1 ms)
-4. Handles German time zone (CET/CEST) conversion to UTC
-5. Adds or overwrites UnixStart and UnixEnd columns
+2. Extracts station number and year from filename (e.g., zst1101_2003.csv)
+3. Adds latitude and longitude from bast_stations_by_city.csv
+4. Converts "Datum" (YYMMDD) and "Stunde" (HH) to Unix timestamps
+5. Creates UnixStart (hour beginning - 1 hour) and UnixEnd (hour ending - 1 ms)
+6. Handles German time zone (CET/CEST) conversion to UTC
+7. Adds or overwrites UnixStart, UnixEnd, latitude, and longitude columns
 
 """
 
 import os
 import pandas as pd
 import glob
+import re
 from datetime import datetime, timedelta
 import pytz
 
@@ -25,25 +28,47 @@ def parse_german_date_time(datum, stunde):
     Parse German date and hour to datetime object.
     
     Args:
-        datum (str): Date in YYMMDD format (e.g., "230101")
+        datum (str): Date in YYMMDD format (e.g., "30101")
         stunde (str): Hour in HH format (e.g., "01")
     
     Returns:
         datetime: Parsed datetime object in German timezone
+    
+    Raises:
+        ValueError: If date or hour cannot be parsed
     """
-    # Parse date (YYMMDD format)
-    year = 2000 + int(datum[:2])  # Convert YY to YYYY
-    month = int(datum[2:4])
-    day = int(datum[4:6])
+    # Pad datum to 6 digits
+    datum = datum.zfill(6)
+    try:
+        year = 2000 + int(datum[:2])  # Convert YY to YYYY
+        month = int(datum[2:4])
+        day = int(datum[4:6])
+    except (ValueError, IndexError) as e:
+        raise ValueError(f"Invalid date format '{datum}': {e}")
     
     # Parse hour
-    hour = int(stunde)
+    try:
+        hour = int(stunde)
+    except ValueError:
+        raise ValueError(f"Invalid hour format '{stunde}': Hour must be numeric")
     
-    # Create datetime object (assume German timezone)
-    german_tz = pytz.timezone('Europe/Berlin')
-    dt = german_tz.localize(datetime(year, month, day, hour, 0, 0))
+    # Handle hour 24 (convert to hour 0 of next day)
+    if hour == 24:
+        hour = 0
+        # Add one day to the date
+        temp_dt = datetime(year, month, day)
+        next_day = temp_dt + timedelta(days=1)
+        year, month, day = next_day.year, next_day.month, next_day.day
+    elif hour < 0 or hour > 23:
+        raise ValueError(f"Invalid hour format '{stunde}': Hour must be in 0..23, got {hour}")
     
-    return dt
+    # Create datetime object in German timezone
+    try:
+        dt = datetime(year, month, day, hour, 0, 0, tzinfo=pytz.timezone('Europe/Berlin'))
+        return dt
+    except Exception as e:
+        print(f"  [DEBUG] Failed to create datetime with year={year}, month={month}, day={day}, hour={hour}, datum='{datum}', stunde='{stunde}'")
+        raise ValueError(f"Error creating datetime object: {e}")
 
 def convert_to_unix_timestamps(dt):
     """
@@ -66,19 +91,82 @@ def convert_to_unix_timestamps(dt):
     
     return unix_start, unix_end
 
-def process_csv_file(file_path, max_rows=None):
+def extract_station_info_from_filename(filename):
     """
-    Process a single CSV file to add Unix timestamps.
+    Extract station number and year from filename.
+    
+    Args:
+        filename (str): Filename like "zst1101_2003.csv"
+    
+    Returns:
+        tuple: (station_number, year) or (None, None) if parsing fails
+    """
+    # Pattern: zst{station_number}_{year}.csv
+    pattern = r'zst(\d+)_(\d{4})\.csv'
+    match = re.match(pattern, filename)
+    
+    if match:
+        station_number = int(match.group(1))
+        year = int(match.group(2))
+        return station_number, year
+    else:
+        return None, None
+
+def load_stations_data():
+    """
+    Load the stations data from bast_stations_by_city.csv.
+    
+    Returns:
+        dict: Dictionary with (year, station_number) as key and (lat, lon) as value
+    """
+    stations_file = "BASt Hourly Data/bast_stations_by_city.csv"
+    
+    try:
+        df = pd.read_csv(stations_file)
+        stations_dict = {}
+        
+        for _, row in df.iterrows():
+            key = (row['year'], row['station_number'])
+            stations_dict[key] = (row['latitude'], row['longitude'])
+        
+        print(f"Loaded {len(stations_dict)} station entries")
+        return stations_dict
+    
+    except Exception as e:
+        print(f"Error loading stations data: {e}")
+        return {}
+
+def process_csv_file(file_path, stations_dict, max_rows=None):
+    """
+    Process a single CSV file to add Unix timestamps and location data.
     
     Args:
         file_path (str): Path to the CSV file
+        stations_dict (dict): Dictionary of station data
         max_rows (int, optional): Maximum number of rows to process (for testing)
     
     Returns:
         bool: True if successful, False otherwise
     """
     try:
-        print(f"Processing: {os.path.basename(file_path)}")
+        filename = os.path.basename(file_path)
+        print(f"Processing: {filename}")
+        
+        # Extract station info from filename
+        station_number, year = extract_station_info_from_filename(filename)
+        if station_number is None or year is None:
+            print(f"  Error: Could not parse station number and year from filename: {filename}")
+            return False
+        
+        # Get station coordinates
+        station_key = (year, station_number)
+        if station_key not in stations_dict:
+            print(f"  Warning: No station data found for year {year}, station {station_number}")
+            print(f"  Skipping this file...")
+            return True  # Return True to continue processing other files
+        
+        latitude, longitude = stations_dict[station_key]
+        print(f"  Station {station_number} ({year}): lat={latitude}, lon={longitude}")
         
         # Read CSV file
         df = pd.read_csv(file_path, sep=';', encoding='utf-8')
@@ -89,20 +177,25 @@ def process_csv_file(file_path, max_rows=None):
             print(f"  Warning: Missing required columns 'Datum' or 'Stunde' in {file_path}")
             return False
         
-        # Remove existing Unix columns if they exist
-        if 'UnixStart' in df.columns:
-            df = df.drop('UnixStart', axis=1)
-            print("  Removed existing UnixStart column")
-        if 'UnixEnd' in df.columns:
-            df = df.drop('UnixEnd', axis=1)
-            print("  Removed existing UnixEnd column")
+        # Remove existing columns if they exist
+        columns_to_remove = ['UnixStart', 'UnixEnd', 'latitude', 'longitude']
+        for col in columns_to_remove:
+            if col in df.columns:
+                df = df.drop(col, axis=1)
+                print(f"  Removed existing {col} column")
         
-        # Prepare new columns as pandas Series with nullable integer dtype
+        # Prepare new columns as pandas Series with appropriate dtypes
         unix_starts = pd.Series([pd.NA] * n_rows, dtype='Int64')
         unix_ends = pd.Series([pd.NA] * n_rows, dtype='Int64')
+        latitudes = pd.Series([latitude] * n_rows, dtype='float64')
+        longitudes = pd.Series([longitude] * n_rows, dtype='float64')
         
         # Only process the first max_rows rows (if specified)
         process_limit = max_rows if max_rows is not None else n_rows
+        processed_count = 0
+        error_count = 0
+        suppressed_count = 0
+        
         for idx in range(process_limit):
             try:
                 row = df.iloc[idx]
@@ -110,17 +203,42 @@ def process_csv_file(file_path, max_rows=None):
                 unix_start, unix_end = convert_to_unix_timestamps(dt)
                 unix_starts.iloc[idx] = unix_start
                 unix_ends.iloc[idx] = unix_end
+                processed_count += 1
+            except ValueError as e:
+                error_msg = str(e)
+                if "suppressed/missing" in error_msg:
+                    suppressed_count += 1
+                    print(f"  Suppressed data at row {idx + 1}: {error_msg}")
+                else:
+                    error_count += 1
+                    print(f"  ERROR at row {idx + 1}: {error_msg}")
+                    print(f"    Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'")
+                    print(f"    Row data: {row.to_dict()}")
+                    print(f"    Terminating due to error...")
+                    return False  # Terminate immediately on first error
             except Exception as e:
-                print(f"  Error processing row {idx}: {e}")
+                error_count += 1
+                print(f"  UNEXPECTED ERROR at row {idx + 1}: {e}")
+                print(f"    Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'")
+                print(f"    Row data: {row.to_dict()}")
+                print(f"    Terminating due to error...")
+                return False  # Terminate immediately on first error
         
         # Add new columns to DataFrame
         df['UnixStart'] = unix_starts
         df['UnixEnd'] = unix_ends
+        df['latitude'] = latitudes
+        df['longitude'] = longitudes
         
         # Save the modified file (all rows preserved)
         df.to_csv(file_path, sep=';', index=False, encoding='utf-8')
         
-        print(f"  Successfully updated UnixStart and UnixEnd for first {process_limit} rows (total rows preserved: {n_rows})")
+        print(f"  Successfully processed {processed_count} rows")
+        if suppressed_count > 0:
+            print(f"  Skipped {suppressed_count} rows with suppressed/missing data")
+        if error_count > 0:
+            print(f"  Encountered {error_count} processing errors")
+        print(f"  Total rows preserved: {n_rows}")
         return True
     except Exception as e:
         print(f"  Error processing {file_path}: {e}")
@@ -130,8 +248,15 @@ def main():
     """
     Main function to process all BASt CSV files.
     """
-    print("BASt Hourly Data to Unix Timestamp Converter")
+    print("BASt Hourly Data to Unix Timestamp Converter with Location Data")
     print("=" * 50)
+    
+    # Load stations data
+    print("Loading stations data...")
+    stations_dict = load_stations_data()
+    if not stations_dict:
+        print("Failed to load stations data. Exiting.")
+        return
     
     # Find all zst*.csv files in the BASt Hourly Data directory
     data_dir = "BASt Hourly Data"
@@ -150,14 +275,17 @@ def main():
     failed = 0
     
     for file_path in sorted(csv_files):
-        # For testing, only process the first file (zst1104_2023.csv) with 5 rows
-        if "zst1104_2023.csv" in file_path:
-            success = process_csv_file(file_path, max_rows=5)
-        else:
-            # Skip other files for now (as requested)
-            print(f"Skipping: {os.path.basename(file_path)} (not in test scope)")
-            continue
-            
+        # For testing, you can uncomment the next line to process only a few files
+        # if "zst1101_2003.csv" not in file_path and "zst1102_2003.csv" not in file_path:
+        #     print(f"Skipping: {os.path.basename(file_path)} (not in test scope)")
+        #     continue
+        
+        # Process the CSV file
+        success = process_csv_file(file_path, stations_dict, None)  # Process all rows
+        if not success:
+            print(f"  Failed to process {os.path.basename(file_path)}. Stopping execution.")
+            return  # Exit the entire script
+        
         if success:
             successful += 1
         else:
