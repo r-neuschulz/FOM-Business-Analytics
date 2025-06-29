@@ -7,6 +7,7 @@ import warnings
 import os
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import MaxNLocator
+from scipy import stats
 warnings.filterwarnings('ignore')
 
 def load_and_prepare_data(station_number=2002):
@@ -195,7 +196,7 @@ def merge_datasets(traffic_hourly, air_processed):
 
 def perform_correlation_analysis(merged_df):
     """
-    Perform correlation analysis between traffic and air pollutants
+    Perform correlation analysis between traffic and air pollutants using established statistical methods
     """
     print("Performing correlation analysis...")
     
@@ -203,20 +204,112 @@ def perform_correlation_analysis(merged_df):
     pollutant_columns = ['aqi', 'co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
     
     # Calculate correlation between traffic and each pollutant
-    correlations = {}
+    correlation_data = []
+    
     for pollutant in pollutant_columns:
         if pollutant in merged_df.columns:
-            corr = merged_df['total_traffic'].corr(merged_df[pollutant])
-            correlations[pollutant] = corr
+            # Remove NaN values for this specific pollutant
+            mask = ~(merged_df['total_traffic'].isna() | merged_df[pollutant].isna())
+            traffic_clean = merged_df['total_traffic'][mask]
+            pollutant_clean = merged_df[pollutant][mask]
+            
+            if len(traffic_clean) > 2:  # Need at least 3 points for correlation
+                try:
+                    # Calculate correlation using pandas (more reliable for type checking)
+                    corr = traffic_clean.corr(pollutant_clean)
+                    
+                    # Calculate p-value and confidence intervals using scipy
+                    if not np.isnan(corr) and abs(corr) < 1.0:
+                        # Calculate t-statistic for p-value
+                        n = len(traffic_clean)
+                        t_stat = corr * np.sqrt((n - 2) / (1 - corr**2))
+                        p_value = 2 * (1 - stats.t.cdf(abs(t_stat), n - 2))
+                        
+                        # Calculate 95% confidence interval using Fisher's z-transformation
+                        # This is the standard method for correlation confidence intervals
+                        z_corr = np.arctanh(corr)  # Fisher's z-transformation
+                        z_se = 1 / np.sqrt(n - 3)  # Standard error of z
+                        z_ci_lower = z_corr - 1.96 * z_se  # 95% CI lower bound
+                        z_ci_upper = z_corr + 1.96 * z_se  # 95% CI upper bound
+                        
+                        # Transform back to correlation scale
+                        ci_lower = np.tanh(z_ci_lower)
+                        ci_upper = np.tanh(z_ci_upper)
+                        
+                        # Calculate standard error of correlation
+                        corr_se = np.sqrt((1 - corr**2) / (n - 2))
+                        
+                        # Determine significance using standard thresholds
+                        if p_value < 0.001:
+                            significance = "***"
+                        elif p_value < 0.01:
+                            significance = "**"
+                        elif p_value < 0.05:
+                            significance = "*"
+                        else:
+                            significance = "ns"
+                        
+                        correlation_data.append({
+                            'pollutant': pollutant,
+                            'correlation': corr,
+                            'p_value': p_value,
+                            'std_error': corr_se,
+                            'ci_lower': ci_lower,
+                            'ci_upper': ci_upper,
+                            'sample_size': n,
+                            'significance': significance
+                        })
+                except (ValueError, RuntimeWarning):
+                    # Skip if correlation calculation fails
+                    continue
     
-    # Create a focused correlation matrix (traffic vs pollutants)
-    correlation_df = pd.DataFrame({
-        'pollutant': list(correlations.keys()),
-        'correlation_with_traffic': list(correlations.values())
-    }).sort_values('correlation_with_traffic', ascending=False)
+    correlation_df = pd.DataFrame(correlation_data)
+    correlation_df = correlation_df.sort_values('correlation', ascending=False)
     
-    print("\nTraffic vs Pollutant Correlations:")
-    print(correlation_df.to_string(index=False))
+    # Print results using standard format
+    print("\n" + "="*90)
+    print("PEARSON CORRELATION ANALYSIS: TRAFFIC VS POLLUTANTS")
+    print("="*90)
+    print(f"{'Pollutant':<8} {'r':<8} {'SE':<8} {'95% CI':<20} {'p-value':<10} {'N':<6} {'Sig':<4}")
+    print("-" * 90)
+    
+    for _, row in correlation_df.iterrows():
+        ci_str = f"[{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]"
+        print(f"{row['pollutant']:<8} {row['correlation']:<8.3f} {row['std_error']:<8.3f} "
+              f"{ci_str:<20} {row['p_value']:<10.4f} {row['sample_size']:<6} {row['significance']:<4}")
+    
+    print("\nSignificance: *** p<0.001, ** p<0.01, * p<0.05, ns not significant")
+    print("SE = Standard Error, CI = Confidence Interval")
+    print("="*90)
+    
+    # Summary of significant correlations
+    significant_correlations = correlation_df[correlation_df['p_value'] < 0.05]
+    print(f"\nSignificant correlations (p < 0.05): {len(significant_correlations)} out of {len(correlation_df)}")
+    
+    if len(significant_correlations) > 0:
+        print("Significant correlations with confidence intervals:")
+        for _, row in significant_correlations.iterrows():
+            ci_str = f"[{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]"
+            print(f"  {row['pollutant']}: r = {row['correlation']:.3f} ± {row['std_error']:.3f}, "
+                  f"95% CI = {ci_str}, p = {row['p_value']:.4f} {row['significance']}")
+    
+    # Null hypothesis rejection summary
+    print(f"\nNull hypothesis rejection summary:")
+    print(f"  Total correlations tested: {len(correlation_df)}")
+    print(f"  Null hypothesis rejected (p < 0.05): {len(significant_correlations)}")
+    print(f"  Null hypothesis not rejected (p ≥ 0.05): {len(correlation_df) - len(significant_correlations)}")
+    
+    if len(significant_correlations) > 0:
+        print(f"\nReasons to reject null hypothesis:")
+        for _, row in significant_correlations.iterrows():
+            direction = "positive" if row['correlation'] > 0 else "negative"
+            strength = "strong" if abs(row['correlation']) > 0.7 else "moderate" if abs(row['correlation']) > 0.3 else "weak"
+            print(f"  {row['pollutant']}: {strength} {direction} correlation (r = {row['correlation']:.3f}, p = {row['p_value']:.4f})")
+            print(f"    - 95% CI does not include zero: [{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]")
+            print(f"    - Standard error: ±{row['std_error']:.3f}")
+            print(f"    - Sample size: n = {row['sample_size']}")
+    
+    print("\n" + "="*90)
     
     # Also calculate full correlation matrix for reference
     full_correlation_columns = ['total_traffic'] + pollutant_columns
@@ -259,23 +352,42 @@ def create_correlation_visualization(correlation_matrix):
     
     return correlation_matrix
 
-def print_correlation_summary(correlation_matrix):
+def print_correlation_summary(correlation_df):
     """
-    Print summary of correlations with traffic
+    Print summary of correlations with traffic including statistical significance
     """
     print("\n" + "="*60)
     print("CORRELATION SUMMARY WITH TRAFFIC")
     print("="*60)
     
-    traffic_correlations = correlation_matrix['total_traffic'].sort_values(ascending=False)
+    # Sort by absolute correlation strength
+    correlation_df['abs_corr'] = correlation_df['correlation'].abs()
+    sorted_df = correlation_df.sort_values('abs_corr', ascending=False)
     
     print("\nCorrelations with Total Traffic (sorted by strength):")
-    print("-" * 50)
-    for pollutant, corr in traffic_correlations.items():
-        if pollutant != 'total_traffic':
-            strength = "Strong" if abs(corr) > 0.7 else "Moderate" if abs(corr) > 0.3 else "Weak"
-            direction = "Positive" if corr > 0 else "Negative"
-            print(f"{pollutant:>8}: {corr:>7.3f} ({strength} {direction})")
+    print("-" * 60)
+    print(f"{'Pollutant':<8} {'Correlation':<12} {'P-value':<10} {'Significance':<12}")
+    print("-" * 60)
+    
+    for _, row in sorted_df.iterrows():
+        if not np.isnan(row['correlation']):
+            strength = "Strong" if abs(row['correlation']) > 0.7 else "Moderate" if abs(row['correlation']) > 0.3 else "Weak"
+            direction = "Positive" if row['correlation'] > 0 else "Negative"
+            significance = row['significance']
+            
+            print(f"{row['pollutant']:<8} {row['correlation']:<12.3f} {row['p_value']:<10.4f} {significance:<12}")
+            print(f"{'':<8} ({strength} {direction})")
+        else:
+            print(f"{row['pollutant']:<8} {'N/A':<12} {'N/A':<10} {'N/A':<12}")
+    
+    # Summary of significant correlations
+    significant_correlations = correlation_df[correlation_df['p_value'] < 0.05]
+    print(f"\nSignificant correlations (p < 0.05): {len(significant_correlations)} out of {len(correlation_df)}")
+    
+    if len(significant_correlations) > 0:
+        print("Significant correlations:")
+        for _, row in significant_correlations.iterrows():
+            print(f"  {row['pollutant']}: r = {row['correlation']:.3f}, p = {row['p_value']:.4f} {row['significance']}")
     
     print("\n" + "="*60)
 
@@ -548,7 +660,7 @@ def main(station_number=5670):
         correlation_matrix = create_correlation_visualization(correlation_df_full)
         
         # Print summary
-        print_correlation_summary(correlation_matrix)
+        print_correlation_summary(correlation_df)
         
         # Save correlation matrix to CSV
         correlation_df_full.to_csv(f'Graphs/station_{station_number}_correlation_matrix.csv')
