@@ -10,3 +10,4 @@ contextily==1.4.0
 Pillow==10.1.0
 pytz==2023.3
 tqdm==4.66.1
+fiona==1.9.5
