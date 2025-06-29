@@ -111,7 +111,7 @@ def get_bast_locations():
     # Generate URLs for years 2003 to 2023
     base_url = "https://www.bast.de/DE/Verkehrstechnik/Fachthemen/v2-verkehrszaehlung/Daten/{year}_1/Jawe{year}.html"
     urls = []
-    for year in range(2003, 2024):
+    for year in range(2020, 2024):
         url = base_url.format(year=year)
         urls.append((year, url))
     
