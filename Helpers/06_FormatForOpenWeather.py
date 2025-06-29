@@ -22,6 +22,9 @@ import glob
 import re
 from datetime import datetime, timedelta
 import pytz
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
+import time
 
 def parse_german_date_time(datum, stunde):
     """
@@ -136,37 +139,40 @@ def load_stations_data():
         print(f"Error loading stations data: {e}")
         return {}
 
-def process_csv_file(file_path, stations_dict, max_rows=None):
+def process_csv_file(args):
     """
     Process a single CSV file to add Unix timestamps and location data.
     
     Args:
-        file_path (str): Path to the CSV file
-        stations_dict (dict): Dictionary of station data
-        max_rows (int, optional): Maximum number of rows to process (for testing)
+        args (tuple): (file_path, stations_dict, max_rows) tuple
     
     Returns:
-        bool: True if successful, False otherwise
+        dict: Result dictionary with status and details
     """
+    file_path, stations_dict, max_rows = args
+    
     try:
         filename = os.path.basename(file_path)
-        print(f"Processing: {filename}")
         
         # Extract station info from filename
         station_number, year = extract_station_info_from_filename(filename)
         if station_number is None or year is None:
-            print(f"  Error: Could not parse station number and year from filename: {filename}")
-            return False
+            return {
+                'status': 'error',
+                'file': filename,
+                'message': f"Could not parse station number and year from filename"
+            }
         
         # Get station coordinates
         station_key = (year, station_number)
         if station_key not in stations_dict:
-            print(f"  Warning: No station data found for year {year}, station {station_number}")
-            print(f"  Skipping this file...")
-            return True  # Return True to continue processing other files
+            return {
+                'status': 'skipped',
+                'file': filename,
+                'message': f"No station data found for year {year}, station {station_number}"
+            }
         
         latitude, longitude = stations_dict[station_key]
-        print(f"  Station {station_number} ({year}): lat={latitude}, lon={longitude}")
         
         # Read CSV file
         df = pd.read_csv(file_path, sep=';', encoding='utf-8')
@@ -174,15 +180,17 @@ def process_csv_file(file_path, stations_dict, max_rows=None):
         
         # Check if required columns exist
         if 'Datum' not in df.columns or 'Stunde' not in df.columns:
-            print(f"  Warning: Missing required columns 'Datum' or 'Stunde' in {file_path}")
-            return False
+            return {
+                'status': 'error',
+                'file': filename,
+                'message': f"Missing required columns 'Datum' or 'Stunde'"
+            }
         
         # Remove existing columns if they exist
         columns_to_remove = ['UnixStart', 'UnixEnd', 'latitude', 'longitude']
         for col in columns_to_remove:
             if col in df.columns:
                 df = df.drop(col, axis=1)
-                print(f"  Removed existing {col} column")
         
         # Prepare new columns as pandas Series with appropriate dtypes
         unix_starts = pd.Series([pd.NA] * n_rows, dtype='Int64')
@@ -208,21 +216,22 @@ def process_csv_file(file_path, stations_dict, max_rows=None):
                 error_msg = str(e)
                 if "suppressed/missing" in error_msg:
                     suppressed_count += 1
-                    print(f"  Suppressed data at row {idx + 1}: {error_msg}")
                 else:
                     error_count += 1
-                    print(f"  ERROR at row {idx + 1}: {error_msg}")
-                    print(f"    Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'")
-                    print(f"    Row data: {row.to_dict()}")
-                    print(f"    Terminating due to error...")
-                    return False  # Terminate immediately on first error
+                    return {
+                        'status': 'error',
+                        'file': filename,
+                        'message': f"Error at row {idx + 1}: {error_msg}",
+                        'details': f"Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'"
+                    }
             except Exception as e:
                 error_count += 1
-                print(f"  UNEXPECTED ERROR at row {idx + 1}: {e}")
-                print(f"    Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'")
-                print(f"    Row data: {row.to_dict()}")
-                print(f"    Terminating due to error...")
-                return False  # Terminate immediately on first error
+                return {
+                    'status': 'error',
+                    'file': filename,
+                    'message': f"Unexpected error at row {idx + 1}: {e}",
+                    'details': f"Datum: '{row['Datum']}', Stunde: '{row['Stunde']}'"
+                }
         
         # Add new columns to DataFrame
         df['UnixStart'] = unix_starts
@@ -233,23 +242,30 @@ def process_csv_file(file_path, stations_dict, max_rows=None):
         # Save the modified file (all rows preserved)
         df.to_csv(file_path, sep=';', index=False, encoding='utf-8')
         
-        print(f"  Successfully processed {processed_count} rows")
-        if suppressed_count > 0:
-            print(f"  Skipped {suppressed_count} rows with suppressed/missing data")
-        if error_count > 0:
-            print(f"  Encountered {error_count} processing errors")
-        print(f"  Total rows preserved: {n_rows}")
-        return True
+        return {
+            'status': 'success',
+            'file': filename,
+            'processed_count': processed_count,
+            'suppressed_count': suppressed_count,
+            'error_count': error_count,
+            'total_rows': n_rows,
+            'station': station_number,
+            'year': year
+        }
+        
     except Exception as e:
-        print(f"  Error processing {file_path}: {e}")
-        return False
+        return {
+            'status': 'error',
+            'file': os.path.basename(file_path),
+            'message': f"Processing error: {e}"
+        }
 
 def main():
     """
-    Main function to process all BASt CSV files.
+    Main function to process all BASt CSV files with parallel processing.
     """
     print("BASt Hourly Data to Unix Timestamp Converter with Location Data")
-    print("=" * 50)
+    print("=" * 60)
     
     # Load stations data
     print("Loading stations data...")
@@ -268,35 +284,62 @@ def main():
         return
     
     print(f"Found {len(csv_files)} CSV files to process")
+    
+    # Determine number of processes to use
+    num_processes = min(cpu_count(), len(csv_files), 8)  # Cap at 8 processes
+    print(f"Using {num_processes} parallel processes")
     print()
     
-    # Process files
+    # Prepare arguments for parallel processing
+    args_list = [(file_path, stations_dict, None) for file_path in sorted(csv_files)]
+    
+    # Process files with progress bar
     successful = 0
     failed = 0
+    skipped = 0
     
-    for file_path in sorted(csv_files):
-        # For testing, you can uncomment the next line to process only a few files
-        # if "zst1101_2003.csv" not in file_path and "zst1102_2003.csv" not in file_path:
-        #     print(f"Skipping: {os.path.basename(file_path)} (not in test scope)")
-        #     continue
-        
-        # Process the CSV file
-        success = process_csv_file(file_path, stations_dict, None)  # Process all rows
-        if not success:
-            print(f"  Failed to process {os.path.basename(file_path)}. Stopping execution.")
-            return  # Exit the entire script
-        
-        if success:
+    start_time = time.time()
+    
+    with Pool(processes=num_processes) as pool:
+        # Use tqdm for progress tracking
+        results = list(tqdm(
+            pool.imap(process_csv_file, args_list),
+            total=len(csv_files),
+            desc="Processing files",
+            unit="file"
+        ))
+    
+    # Process results
+    for result in results:
+        if result['status'] == 'success':
             successful += 1
-        else:
+        elif result['status'] == 'error':
             failed += 1
-        
-        print()
+            print(f"❌ ERROR: {result['file']} - {result['message']}")
+            if 'details' in result:
+                print(f"   Details: {result['details']}")
+        elif result['status'] == 'skipped':
+            skipped += 1
+            print(f"⚠️  SKIPPED: {result['file']} - {result['message']}")
     
-    print("Processing Summary:")
-    print(f"  Successful: {successful}")
-    print(f"  Failed: {failed}")
-    print(f"  Total: {successful + failed}")
+    end_time = time.time()
+    processing_time = end_time - start_time
+    
+    print()
+    print("=" * 60)
+    print("PROCESSING SUMMARY")
+    print("=" * 60)
+    print(f"✅ Successful: {successful}")
+    print(f"❌ Failed: {failed}")
+    print(f"⚠️  Skipped: {skipped}")
+    print(f"📊 Total: {successful + failed + skipped}")
+    print(f"⏱️  Processing time: {processing_time:.2f} seconds")
+    print(f"🚀 Average time per file: {processing_time/len(csv_files):.3f} seconds")
+    
+    if failed > 0:
+        print(f"\n⚠️  {failed} files failed to process. Check the error messages above.")
+    else:
+        print(f"\n🎉 All files processed successfully!")
 
 if __name__ == "__main__":
     main() 
