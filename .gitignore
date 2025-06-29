@@ -2,7 +2,7 @@
 BASt Hourly Data/zst*.csv
 BASt Hourly Data/zst*_not_zip
 BASt Station Files/Jawe*.html
-owm Hourly Data/
+owm Hourly Data/*
 
 # Python
 __pycache__/
