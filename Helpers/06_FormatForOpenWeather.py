@@ -82,11 +82,7 @@ def process_csv_file(file_path, max_rows=None):
         
         # Read CSV file
         df = pd.read_csv(file_path, sep=';', encoding='utf-8')
-        
-        # Limit rows for testing if specified
-        if max_rows:
-            df = df.head(max_rows)
-            print(f"  Processing first {max_rows} rows for testing")
+        n_rows = len(df)
         
         # Check if required columns exist
         if 'Datum' not in df.columns or 'Stunde' not in df.columns:
@@ -97,43 +93,35 @@ def process_csv_file(file_path, max_rows=None):
         if 'UnixStart' in df.columns:
             df = df.drop('UnixStart', axis=1)
             print("  Removed existing UnixStart column")
-        
         if 'UnixEnd' in df.columns:
             df = df.drop('UnixEnd', axis=1)
             print("  Removed existing UnixEnd column")
         
-        # Convert to Unix timestamps
-        unix_starts = []
-        unix_ends = []
+        # Prepare new columns as pandas Series with nullable integer dtype
+        unix_starts = pd.Series([pd.NA] * n_rows, dtype='Int64')
+        unix_ends = pd.Series([pd.NA] * n_rows, dtype='Int64')
         
-        for idx, row in df.iterrows():
+        # Only process the first max_rows rows (if specified)
+        process_limit = max_rows if max_rows is not None else n_rows
+        for idx in range(process_limit):
             try:
-                # Parse date and time
+                row = df.iloc[idx]
                 dt = parse_german_date_time(str(row['Datum']), str(row['Stunde']))
-                
-                # Convert to Unix timestamps
                 unix_start, unix_end = convert_to_unix_timestamps(dt)
-                
-                unix_starts.append(unix_start)
-                unix_ends.append(unix_end)
-                
+                unix_starts.iloc[idx] = unix_start
+                unix_ends.iloc[idx] = unix_end
             except Exception as e:
                 print(f"  Error processing row {idx}: {e}")
-                unix_starts.append(None)
-                unix_ends.append(None)
         
-        # Add new columns
+        # Add new columns to DataFrame
         df['UnixStart'] = unix_starts
         df['UnixEnd'] = unix_ends
         
-        # Save the modified file
+        # Save the modified file (all rows preserved)
         df.to_csv(file_path, sep=';', index=False, encoding='utf-8')
         
-        print(f"  Successfully processed {len(df)} rows")
-        print(f"  Added UnixStart and UnixEnd columns")
-        
+        print(f"  Successfully updated UnixStart and UnixEnd for first {process_limit} rows (total rows preserved: {n_rows})")
         return True
-        
     except Exception as e:
         print(f"  Error processing {file_path}: {e}")
         return False
