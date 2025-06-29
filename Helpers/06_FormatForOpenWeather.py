@@ -25,6 +25,8 @@ import pytz
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 import time
+import requests
+import json
 
 def parse_german_date_time(datum, stunde):
     """
@@ -40,59 +42,39 @@ def parse_german_date_time(datum, stunde):
     Raises:
         ValueError: If date or hour cannot be parsed
     """
-    # Pad datum to 6 digits
-    datum = datum.zfill(6)
-    try:
-        year = 2000 + int(datum[:2])  # Convert YY to YYYY
-        month = int(datum[2:4])
-        day = int(datum[4:6])
-    except (ValueError, IndexError) as e:
-        raise ValueError(f"Invalid date format '{datum}': {e}")
-    
-    # Parse hour
-    try:
-        hour = int(stunde)
-    except ValueError:
-        raise ValueError(f"Invalid hour format '{stunde}': Hour must be numeric")
-    
-    # Handle hour 24 (convert to hour 0 of next day)
+    datum = str(datum).zfill(6)
+    year = 2000 + int(datum[:2])
+    month = int(datum[2:4])
+    day = int(datum[4:6])
+    hour = int(stunde)
     if hour == 24:
         hour = 0
-        # Add one day to the date
         temp_dt = datetime(year, month, day)
         next_day = temp_dt + timedelta(days=1)
         year, month, day = next_day.year, next_day.month, next_day.day
-    elif hour < 0 or hour > 23:
-        raise ValueError(f"Invalid hour format '{stunde}': Hour must be in 0..23, got {hour}")
-    
-    # Create datetime object in German timezone
-    try:
-        dt = datetime(year, month, day, hour, 0, 0, tzinfo=pytz.timezone('Europe/Berlin'))
-        return dt
-    except Exception as e:
-        print(f"  [DEBUG] Failed to create datetime with year={year}, month={month}, day={day}, hour={hour}, datum='{datum}', stunde='{stunde}'")
-        raise ValueError(f"Error creating datetime object: {e}")
+    dt = datetime(year, month, day, hour, 0, 0, tzinfo=pytz.timezone('Europe/Berlin'))
+    return dt
 
-def convert_to_unix_timestamps(dt):
-    """
-    Convert German datetime to Unix start and end timestamps.
-    
-    Args:
-        dt (datetime): German timezone datetime object
-    
-    Returns:
-        tuple: (unix_start, unix_end) in seconds since epoch
-    """
-    # Convert to UTC
+def convert_to_unix_start(dt):
     utc_dt = dt.astimezone(pytz.UTC)
-    
-    # UnixStart: beginning of the hour (hour - 1 hour)
-    unix_start = int((utc_dt - timedelta(hours=1)).timestamp())
-    
-    # UnixEnd: end of the hour (hour - 1 millisecond)
-    unix_end = int((utc_dt - timedelta(milliseconds=1)).timestamp())
-    
-    return unix_start, unix_end
+    return int((utc_dt - timedelta(hours=1)).timestamp())
+
+def convert_to_unix_end(dt):
+    utc_dt = dt.astimezone(pytz.UTC)
+    return int((utc_dt - timedelta(seconds=1)).timestamp())
+
+def get_openweather_air_pollution_data(lat, lon, start_time, end_time, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/air_pollution/history"
+    params = {
+        'lat': lat,
+        'lon': lon,
+        'start': start_time,
+        'end': end_time,
+        'appid': api_key
+    }
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()
+    return response.json()
 
 def extract_station_info_from_filename(filename):
     """
@@ -208,7 +190,7 @@ def process_csv_file(args):
             try:
                 row = df.iloc[idx]
                 dt = parse_german_date_time(str(row['Datum']), str(row['Stunde']))
-                unix_start, unix_end = convert_to_unix_timestamps(dt)
+                unix_start, unix_end = convert_to_unix_start(dt), convert_to_unix_end(dt)
                 unix_starts.iloc[idx] = unix_start
                 unix_ends.iloc[idx] = unix_end
                 processed_count += 1
@@ -261,85 +243,76 @@ def process_csv_file(args):
         }
 
 def main():
-    """
-    Main function to process all BASt CSV files with parallel processing.
-    """
-    print("BASt Hourly Data to Unix Timestamp Converter with Location Data")
-    print("=" * 60)
-    
-    # Load stations data
-    print("Loading stations data...")
-    stations_dict = load_stations_data()
-    if not stations_dict:
-        print("Failed to load stations data. Exiting.")
-        return
-    
-    # Find all zst*.csv files in the BASt Hourly Data directory
+    # Only process a single file for now
     data_dir = "BASt Hourly Data"
     pattern = os.path.join(data_dir, "zst*.csv")
-    csv_files = glob.glob(pattern)
-    
-    if not csv_files:
-        print(f"No zst*.csv files found in {data_dir}")
+    csv_files = [f for f in sorted(os.listdir(data_dir)) if f.startswith('zst') and f.endswith('.csv')]
+    # Only keep files with year > 2020
+    filtered_files = []
+    for f in csv_files:
+        m = re.match(r'zst\d+_(\d{4})\.csv', f)
+        if m and int(m.group(1)) > 2020:
+            filtered_files.append(f)
+    if not filtered_files:
+        print(f"No zst*.csv files with year > 2020 found in {data_dir}")
         return
-    
-    print(f"Found {len(csv_files)} CSV files to process")
-    
-    # Determine number of processes to use
-    num_processes = min(cpu_count(), len(csv_files), 8)  # Cap at 8 processes
-    print(f"Using {num_processes} parallel processes")
-    print()
-    
-    # Prepare arguments for parallel processing
-    args_list = [(file_path, stations_dict, None) for file_path in sorted(csv_files)]
-    
-    # Process files with progress bar
-    successful = 0
-    failed = 0
-    skipped = 0
-    
-    start_time = time.time()
-    
-    with Pool(processes=num_processes) as pool:
-        # Use tqdm for progress tracking
-        results = list(tqdm(
-            pool.imap(process_csv_file, args_list),
-            total=len(csv_files),
-            desc="Processing files",
-            unit=" files"
-        ))
-    
-    # Process results
-    for result in results:
-        if result['status'] == 'success':
-            successful += 1
-        elif result['status'] == 'error':
-            failed += 1
-            print(f"ERROR: {result['file']} - {result['message']}")
-            if 'details' in result:
-                print(f"   Details: {result['details']}")
-        elif result['status'] == 'skipped':
-            skipped += 1
-            print(f"SKIPPED: {result['file']} - {result['message']}")
-    
-    end_time = time.time()
-    processing_time = end_time - start_time
-    
-    print()
-    print("=" * 60)
-    print("PROCESSING SUMMARY")
-    print("=" * 60)
-    print(f"SUCCESS: {successful}")
-    print(f"FAILED: {failed}")
-    print(f"SKIPPED: {skipped}")
-    print(f"TOTAL: {successful + failed + skipped}")
-    print(f"PROCESSING TIME: {processing_time:.2f} seconds")
-    print(f"AVERAGE TIME PER FILE: {processing_time/len(csv_files):.3f} seconds")
-    
-    if failed > 0:
-        print(f"\nWARNING: {failed} files failed to process. Check the error messages above.")
-    else:
-        print(f"\nSUCCESS: All files processed successfully!")
+    filename = filtered_files[0]
+    file_path = os.path.join(data_dir, filename)
+    print(f"Processing file: {filename}")
+
+    # Extract station and year from filename
+    m = re.match(r'zst(\d+)_(\d{4})\.csv', filename)
+    if not m:
+        print("Could not parse station number and year from filename")
+        return
+    station_number, year = m.group(1), m.group(2)
+
+    # Get lat/lon from bast_stations_by_city.csv
+    stations_file = os.path.join(data_dir, "bast_stations_by_city.csv")
+    stations_df = pd.read_csv(stations_file)
+    row = stations_df[(stations_df['station_number'] == int(station_number)) & (stations_df['year'] == int(year))]
+    if row.empty:
+        print(f"No station data found for year {year}, station {station_number}")
+        return
+    lat, lon = float(row.iloc[0]['latitude']), float(row.iloc[0]['longitude'])
+
+    # Read the BASt CSV (read-only)
+    df = pd.read_csv(file_path, sep=';', encoding='utf-8')
+    if df.empty:
+        print("CSV is empty")
+        return
+    # Parse first and last row for start/end
+    first_row = df.iloc[0]
+    last_row = df.iloc[-1]
+    dt_start = parse_german_date_time(first_row['Datum'], first_row['Stunde'])
+    dt_end = parse_german_date_time(last_row['Datum'], last_row['Stunde'])
+    unix_start = convert_to_unix_start(dt_start)
+    unix_end = convert_to_unix_end(dt_end)
+    print(f"Unix start: {unix_start}, Unix end: {unix_end}")
+
+    # OWM API call
+    api_key = "489eb9ae90ccd3a36e081f88e281293f"
+    try:
+        response = get_openweather_air_pollution_data(lat, lon, unix_start, unix_end, api_key)
+    except Exception as e:
+        print(f"API error: {e}")
+        return
+    # Write aqi, components, dt to new CSV
+    owm_list = response.get('list', [])
+    if not owm_list:
+        print("No data from OWM API")
+        return
+    out_rows = []
+    for entry in owm_list:
+        row = {'dt': entry.get('dt'), 'aqi': entry.get('main', {}).get('aqi')}
+        row.update(entry.get('components', {}))
+        out_rows.append(row)
+    out_df = pd.DataFrame(out_rows)
+    out_dir = "owm Hourly Data"
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, f"owm{station_number}_{year}.csv")
+    out_df.to_csv(out_file, index=False)
+    print(f"Wrote OWM data to {out_file}")
 
 if __name__ == "__main__":
     main() 
