@@ -218,6 +218,12 @@ def perform_correlation_analysis(merged_df):
                     # Calculate correlation using pandas (more reliable for type checking)
                     corr = traffic_clean.corr(pollutant_clean)
                     
+                    # Calculate descriptive statistics
+                    traffic_mean = traffic_clean.mean()
+                    traffic_std = traffic_clean.std()
+                    pollutant_mean = pollutant_clean.mean()
+                    pollutant_std = pollutant_clean.std()
+                    
                     # Calculate p-value and confidence intervals using scipy
                     if not np.isnan(corr) and abs(corr) < 1.0:
                         # Calculate t-statistic for p-value
@@ -257,7 +263,11 @@ def perform_correlation_analysis(merged_df):
                             'ci_lower': ci_lower,
                             'ci_upper': ci_upper,
                             'sample_size': n,
-                            'significance': significance
+                            'significance': significance,
+                            'traffic_mean': traffic_mean,
+                            'traffic_std': traffic_std,
+                            'pollutant_mean': pollutant_mean,
+                            'pollutant_std': pollutant_std
                         })
                 except (ValueError, RuntimeWarning):
                     # Skip if correlation calculation fails
@@ -266,21 +276,23 @@ def perform_correlation_analysis(merged_df):
     correlation_df = pd.DataFrame(correlation_data)
     correlation_df = correlation_df.sort_values('correlation', ascending=False)
     
-    # Print results using standard format
-    print("\n" + "="*90)
+    # Print results using standard format with descriptive statistics
+    print("\n" + "="*120)
     print("PEARSON CORRELATION ANALYSIS: TRAFFIC VS POLLUTANTS")
-    print("="*90)
-    print(f"{'Pollutant':<8} {'r':<8} {'SE':<8} {'95% CI':<20} {'p-value':<10} {'N':<6} {'Sig':<4}")
-    print("-" * 90)
+    print("="*120)
+    print(f"{'Pollutant':<8} {'r':<8} {'SE':<8} {'95% CI':<20} {'p-value':<10} {'N':<6} {'Sig':<4} {'Traffic Mean':<15} {'Pollutant Mean':<15}")
+    print("-" * 120)
     
     for _, row in correlation_df.iterrows():
         ci_str = f"[{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]"
         print(f"{row['pollutant']:<8} {row['correlation']:<8.3f} {row['std_error']:<8.3f} "
-              f"{ci_str:<20} {row['p_value']:<10.4f} {row['sample_size']:<6} {row['significance']:<4}")
+              f"{ci_str:<20} {row['p_value']:<10.4f} {row['sample_size']:<6} {row['significance']:<4} "
+              f"{row['traffic_mean']:<15.1f} {row['pollutant_mean']:<15.3f}")
     
     print("\nSignificance: *** p<0.001, ** p<0.01, * p<0.05, ns not significant")
     print("SE = Standard Error, CI = Confidence Interval")
-    print("="*90)
+    print("Traffic Mean = Mean vehicles per hour, Pollutant Mean = Mean concentration")
+    print("="*120)
     
     # Summary of significant correlations
     significant_correlations = correlation_df[correlation_df['p_value'] < 0.05]
@@ -292,6 +304,8 @@ def perform_correlation_analysis(merged_df):
             ci_str = f"[{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]"
             print(f"  {row['pollutant']}: r = {row['correlation']:.3f} ± {row['std_error']:.3f}, "
                   f"95% CI = {ci_str}, p = {row['p_value']:.4f} {row['significance']}")
+            print(f"    Traffic: {row['traffic_mean']:.1f} ± {row['traffic_std']:.1f} vehicles/h")
+            print(f"    {row['pollutant']}: {row['pollutant_mean']:.3f} ± {row['pollutant_std']:.3f}")
     
     # Null hypothesis rejection summary
     print(f"\nNull hypothesis rejection summary:")
@@ -308,8 +322,10 @@ def perform_correlation_analysis(merged_df):
             print(f"    - 95% CI does not include zero: [{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]")
             print(f"    - Standard error: ±{row['std_error']:.3f}")
             print(f"    - Sample size: n = {row['sample_size']}")
+            print(f"    - Traffic levels: {row['traffic_mean']:.1f} ± {row['traffic_std']:.1f} vehicles/h")
+            print(f"    - {row['pollutant']} levels: {row['pollutant_mean']:.3f} ± {row['pollutant_std']:.3f}")
     
-    print("\n" + "="*90)
+    print("\n" + "="*120)
     
     # Also calculate full correlation matrix for reference
     full_correlation_columns = ['total_traffic'] + pollutant_columns
@@ -356,18 +372,18 @@ def print_correlation_summary(correlation_df):
     """
     Print summary of correlations with traffic including statistical significance
     """
-    print("\n" + "="*60)
+    print("\n" + "="*80)
     print("CORRELATION SUMMARY WITH TRAFFIC")
-    print("="*60)
+    print("="*80)
     
     # Sort by absolute correlation strength
     correlation_df['abs_corr'] = correlation_df['correlation'].abs()
     sorted_df = correlation_df.sort_values('abs_corr', ascending=False)
     
     print("\nCorrelations with Total Traffic (sorted by strength):")
-    print("-" * 60)
-    print(f"{'Pollutant':<8} {'Correlation':<12} {'P-value':<10} {'Significance':<12}")
-    print("-" * 60)
+    print("-" * 80)
+    print(f"{'Pollutant':<8} {'Correlation':<12} {'P-value':<10} {'Significance':<12} {'Traffic Mean':<15} {'Pollutant Mean':<15}")
+    print("-" * 80)
     
     for _, row in sorted_df.iterrows():
         if not np.isnan(row['correlation']):
@@ -375,21 +391,36 @@ def print_correlation_summary(correlation_df):
             direction = "Positive" if row['correlation'] > 0 else "Negative"
             significance = row['significance']
             
-            print(f"{row['pollutant']:<8} {row['correlation']:<12.3f} {row['p_value']:<10.4f} {significance:<12}")
+            print(f"{row['pollutant']:<8} {row['correlation']:<12.3f} {row['p_value']:<10.4f} {significance:<12} "
+                  f"{row['traffic_mean']:<15.1f} {row['pollutant_mean']:<15.3f}")
             print(f"{'':<8} ({strength} {direction})")
         else:
-            print(f"{row['pollutant']:<8} {'N/A':<12} {'N/A':<10} {'N/A':<12}")
+            print(f"{row['pollutant']:<8} {'N/A':<12} {'N/A':<10} {'N/A':<12} {'N/A':<15} {'N/A':<15}")
     
     # Summary of significant correlations
     significant_correlations = correlation_df[correlation_df['p_value'] < 0.05]
     print(f"\nSignificant correlations (p < 0.05): {len(significant_correlations)} out of {len(correlation_df)}")
     
     if len(significant_correlations) > 0:
-        print("Significant correlations:")
+        print("Significant correlations with descriptive statistics:")
         for _, row in significant_correlations.iterrows():
             print(f"  {row['pollutant']}: r = {row['correlation']:.3f}, p = {row['p_value']:.4f} {row['significance']}")
+            print(f"    Traffic: {row['traffic_mean']:.1f} ± {row['traffic_std']:.1f} vehicles/h")
+            print(f"    {row['pollutant']}: {row['pollutant_mean']:.3f} ± {row['pollutant_std']:.3f}")
     
-    print("\n" + "="*60)
+    # Practical significance assessment
+    print(f"\nPractical Significance Assessment:")
+    print(f"  Traffic levels: Mean = {correlation_df['traffic_mean'].iloc[0]:.1f} vehicles/h")
+    print(f"  This represents typical hourly traffic volume at this station")
+    print(f"  Correlations show how traffic changes relate to pollutant changes")
+    
+    # Effect size interpretation
+    print(f"\nEffect Size Interpretation:")
+    print(f"  Strong correlations (|r| > 0.7): {len(correlation_df[correlation_df['abs_corr'] > 0.7])}")
+    print(f"  Moderate correlations (0.3 < |r| ≤ 0.7): {len(correlation_df[(correlation_df['abs_corr'] > 0.3) & (correlation_df['abs_corr'] <= 0.7)])}")
+    print(f"  Weak correlations (|r| ≤ 0.3): {len(correlation_df[correlation_df['abs_corr'] <= 0.3])}")
+    
+    print("\n" + "="*80)
 
 def create_scatter_plots(merged_df):
     """
@@ -631,6 +662,127 @@ def create_timeseries_overview_plot(merged_df, station_number):
     plt.savefig('Graphs/traffic_pollutants_timeseries_overview.png', dpi=300)
     print('Saved: Graphs/traffic_pollutants_timeseries_overview.png')
 
+def perform_linear_regression_analysis(merged_df):
+    """
+    Perform linear regression analysis between traffic and air pollutants to get effect sizes
+    """
+    print("\n" + "="*120)
+    print("LINEAR REGRESSION ANALYSIS: TRAFFIC VS POLLUTANTS")
+    print("="*120)
+    
+    # Focus on traffic vs pollutants regression
+    pollutant_columns = ['aqi', 'co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
+    
+    # Calculate regression for each pollutant
+    regression_data = []
+    
+    for pollutant in pollutant_columns:
+        if pollutant in merged_df.columns:
+            # Remove NaN values for this specific pollutant
+            mask = ~(merged_df['total_traffic'].isna() | merged_df[pollutant].isna())
+            traffic_clean = merged_df['total_traffic'][mask]
+            pollutant_clean = merged_df[pollutant][mask]
+            
+            if len(traffic_clean) > 2:  # Need at least 3 points for regression
+                try:
+                    # Perform linear regression
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(traffic_clean, pollutant_clean)
+                    r_squared = float(r_value) ** 2 # type: ignore
+                    
+                    # Calculate confidence intervals for slope
+                    # Degrees of freedom
+                    df = len(traffic_clean) - 2
+                    
+                    # t-critical value for 95% confidence interval
+                    t_critical = stats.t.ppf(0.975, df)
+                    
+                    # Confidence interval for slope
+                    slope_ci_lower = float(slope) - t_critical * float(std_err) #type: ignore
+                    slope_ci_upper = float(slope) + t_critical * float(std_err) #type: ignore
+                    
+                    # Calculate predicted values for R-squared interpretation
+                    predicted = slope * traffic_clean + intercept
+                    
+                    # Calculate mean values for context
+                    traffic_mean = traffic_clean.mean()
+                    pollutant_mean = pollutant_clean.mean()
+                    
+                    # Determine significance
+                    if float(p_value) < 0.001: #type: ignore
+                        significance = "***"
+                    elif float(p_value) < 0.01: #type: ignore
+                        significance = "**"
+                    elif float(p_value) < 0.05: #type: ignore
+                        significance = "*"
+                    else:
+                        significance = "ns"
+                    
+                    regression_data.append({
+                        'pollutant': pollutant,
+                        'slope': float(slope), #type: ignore
+                        'slope_std_err': float(std_err), #type: ignore
+                        'slope_ci_lower': slope_ci_lower,
+                        'slope_ci_upper': slope_ci_upper,
+                        'intercept': float(intercept), #type: ignore
+                        'r_squared': r_squared,
+                        'p_value': float(p_value), #type: ignore
+                        'significance': significance,
+                        'sample_size': len(traffic_clean),
+                        'traffic_mean': traffic_mean,
+                        'pollutant_mean': pollutant_mean
+                    })
+                    
+                except (ValueError, RuntimeWarning):
+                    # Skip if regression calculation fails
+                    continue
+    
+    regression_df = pd.DataFrame(regression_data)
+    regression_df = regression_df.sort_values('r_squared', ascending=False)
+    
+    # Print results
+    print(f"{'Pollutant':<8} {'Slope':<12} {'SE':<10} {'95% CI':<25} {'R²':<8} {'p-value':<10} {'Sig':<4} {'Pollutant Mean':<15} {'Traffic Mean':<15}")
+    print("-" * 120)
+    
+    for _, row in regression_df.iterrows():
+        ci_str = f"[{row['slope_ci_lower']:.6f}, {row['slope_ci_upper']:.6f}]"
+        
+        print(f"{row['pollutant']:<8} {row['slope']:<12.6f} {row['slope_std_err']:<10.6f} "
+              f"{ci_str:<25} {row['r_squared']:<8.4f} {row['p_value']:<10.4f} {row['significance']:<4} "
+              f"{row['pollutant_mean']:<15.3f} {row['traffic_mean']:<15.1f}")
+    
+    print("\nSlope = Change in pollutant per additional vehicle per hour")
+    print("SE = Standard Error of the slope")
+    print("95% CI = 95% Confidence Interval for the slope")
+    print("R² = Proportion of variance explained by traffic")
+    print("Significance: *** p<0.001, ** p<0.01, * p<0.05, ns not significant")
+    print("Pollutant Mean = Average concentration in μg m⁻³")
+    print("Traffic Mean = Average vehicles per hour")
+    print("="*120)
+    
+    # Summary of significant regressions
+    significant_regressions = regression_df[regression_df['p_value'] < 0.05]
+    print(f"\nSignificant regressions (p < 0.05): {len(significant_regressions)} out of {len(regression_df)}")
+    
+    if len(significant_regressions) > 0:
+        print("Significant regressions with effect sizes:")
+        for _, row in significant_regressions.iterrows():
+            ci_str = f"[{row['slope_ci_lower']:.6f}, {row['slope_ci_upper']:.6f}]"
+            direction = "increase" if row['slope'] > 0 else "decrease"
+            print(f"  {row['pollutant']}: {row['slope']:.6f} ± {row['slope_std_err']:.6f} per vehicle/h")
+            print(f"    - 95% CI: {ci_str}")
+            print(f"    - For each additional vehicle/h, {row['pollutant']} {direction}s by {abs(row['slope']):.6f} μg m⁻³")
+            print(f"    - R² = {row['r_squared']:.4f} ({row['r_squared']*100:.1f}% of variance explained)")
+            print(f"    - p = {row['p_value']:.4f} {row['significance']}")
+    
+    # Practical interpretation
+    print(f"\nPractical Interpretation:")
+    print(f"  Traffic levels: Mean = {regression_df['traffic_mean'].iloc[0]:.1f} vehicles/h")
+    print(f"  Slopes show the change in pollutant concentration per additional vehicle per hour")
+    print(f"  Positive slopes: pollutant increases with traffic")
+    print(f"  Negative slopes: pollutant decreases with traffic (may indicate dilution or other factors)")
+    
+    return regression_df
+
 def main(station_number=5670):
     """
     Main function to execute the correlation analysis for a specific station
@@ -675,6 +827,13 @@ def main(station_number=5670):
         
         # Create timeseries overview plot
         create_timeseries_overview_plot(merged_df, station_number)
+        
+        # Perform linear regression analysis
+        regression_df = perform_linear_regression_analysis(merged_df)
+        
+        # Save regression results to CSV
+        regression_df.to_csv(f'Graphs/station_{station_number}_regression_results.csv', index=False)
+        print(f"Regression results saved to: Graphs/station_{station_number}_regression_results.csv")
         
         print("\nAnalysis completed successfully!")
         
