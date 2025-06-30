@@ -8,6 +8,9 @@ import os
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import MaxNLocator
 from scipy import stats
+from statsmodels.tsa.stattools import acf
+from statsmodels.graphics.tsaplots import plot_acf
+from matplotlib.gridspec import GridSpec
 warnings.filterwarnings('ignore')
 
 def load_and_prepare_data(station_number=2002):
@@ -498,10 +501,10 @@ def create_scatter_plots(merged_df):
                     'aqi': 'Air Quality Index (AQI) vs Traffic',
                     'no': 'Nitric Oxide (NO) vs Traffic',
                     'co': 'Carbon Monoxide (CO) vs Traffic',
-                    'pm2_5': 'Fine Particulate Matter (PM₂.₅) vs Traffic',
+                    'pm2_5': 'Fine Particulate Matter (PM2.5) vs Traffic',
                     'no2': 'Nitrogen Dioxide (NO₂) vs Traffic',
                     'o3': 'Ozone (O₃) vs Traffic',
-                    'pm10': 'Coarse Particulate Matter (PM₁₀) vs Traffic',
+                    'pm10': 'Coarse Particulate Matter (PM10) vs Traffic',
                     'nh3': 'Ammonia (NH₃) vs Traffic',
                     'so2': 'Sulfur Dioxide (SO₂) vs Traffic'
                 }
@@ -783,6 +786,294 @@ def perform_linear_regression_analysis(merged_df):
     
     return regression_df
 
+def perform_autocorrelation_analysis(merged_df, station_number):
+    """
+    Perform autocorrelation analysis on total traffic and all pollutants
+    to identify temporal patterns and seasonality
+    """
+    print("\n" + "="*80)
+    print("AUTOCORRELATION ANALYSIS: TEMPORAL PATTERNS")
+    print("="*80)
+    
+    # Sort by datetime to ensure proper time series order
+    df_sorted = merged_df.sort_values('datetime_utc').reset_index(drop=True)
+    
+    # Variables to analyze
+    variables = ['total_traffic'] + ['aqi', 'co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
+    
+    # Colors for each variable
+    colors = {
+        'total_traffic': 'black',
+        'aqi': 'green',
+        'co': 'black',
+        'pm2_5': 'grey',
+        'pm10': '#404040',
+        'no': '#D2B48C',
+        'no2': '#8B4513',
+        'nh3': 'purple',
+        'o3': '#00008B',
+        'so2': '#B8860B'
+    }
+    
+    # Titles for each variable
+    titles = {
+        'total_traffic': 'Total Traffic (vehicles/h)',
+        'aqi': 'Air Quality Index (AQI)',
+        'co': 'Carbon Monoxide (CO) / μg m⁻³',
+        'no': 'Nitric Oxide (NO) / μg m⁻³',
+        'no2': 'Nitrogen Dioxide (NO₂) / μg m⁻³',
+        'o3': 'Ozone (O₃) / μg m⁻³',
+        'so2': 'Sulfur Dioxide (SO₂) / μg m⁻³',
+        'pm2_5': 'Fine Particulate Matter (PM2.5) / μg m⁻³',
+        'pm10': 'Coarse Particulate Matter (PM10) / μg m⁻³',
+        'nh3': 'Ammonia (NH₃) / μg m⁻³'
+    }
+    
+    # Calculate maximum lag (up to 240 hours = 10 days)
+    max_lag = min(240, len(df_sorted) // 4)  # Use 1/4 of data length or 10 days, whichever is smaller
+    
+    print(f"Performing autocorrelation analysis with max lag: {max_lag} hours ({max_lag/24:.1f} days)")
+    
+    # Create subplots for autocorrelation analysis - use GridSpec for custom layout
+    fig = plt.figure(figsize=(18, 20))
+    gs = GridSpec(4, 3, figure=fig, height_ratios=[1.5, 1, 1, 1])
+    
+    # Total Traffic gets the top 3 slots (spanning all columns)
+    ax_traffic = fig.add_subplot(gs[0, :])
+    
+    # Other variables get individual slots starting from row 1
+    axes = []
+    for i in range(1, 4):  # Rows 1, 2, 3
+        for j in range(3):  # Columns 0, 1, 2
+            axes.append(fig.add_subplot(gs[i, j]))
+    
+    autocorr_results = {}
+    
+    # Process Total Traffic first (special handling)
+    variable = 'total_traffic'
+    if variable in df_sorted.columns:
+        ax = ax_traffic
+        
+        # Get clean data (remove NaN values)
+        data = df_sorted[variable].dropna()
+        
+        if len(data) > max_lag + 10:  # Need sufficient data for autocorrelation
+            try:
+                # Calculate autocorrelation function - handle return values properly
+                acf_result = acf(data, nlags=max_lag, alpha=0.05, fft=True)
+                
+                # Handle different return formats from acf function
+                if isinstance(acf_result, tuple):
+                    if len(acf_result) == 2:
+                        acf_values, confint = acf_result
+                    elif len(acf_result) == 3:
+                        acf_values, confint, _ = acf_result
+                    elif len(acf_result) == 4:
+                        acf_values, confint, _, _ = acf_result
+                    else:
+                        acf_values = acf_result[0]
+                        confint = None
+                else:
+                    acf_values = acf_result
+                    confint = None
+                
+                # Create lag array
+                lags = np.arange(0, max_lag + 1)
+                
+                # Plot autocorrelation
+                ax.plot(lags, acf_values, color=colors[variable], linewidth=3, label=variable)
+                
+                # Add confidence intervals (95%) if available
+                if confint is not None:
+                    ax.fill_between(lags, confint[:, 0] - acf_values, confint[:, 1] - acf_values, 
+                                   alpha=0.3, color=colors[variable])
+                
+                # Add horizontal line at zero
+                ax.axhline(y=0, color='black', linestyle='-', alpha=0.5)
+                
+                # Add significance threshold lines
+                ax.axhline(y=1.96/np.sqrt(len(data)), color='red', linestyle='--', alpha=0.7, label='95% CI')
+                ax.axhline(y=-1.96/np.sqrt(len(data)), color='red', linestyle='--', alpha=0.7)
+                
+                # Set labels and title
+                ax.set_xlabel('Lag (hours)')
+                ax.set_ylabel('Autocorrelation')
+                ax.set_title(f'{titles[variable]} - Autocorrelation Analysis', fontsize=14, fontweight='bold')
+                ax.grid(True, alpha=0.3)
+                ax.legend()
+                
+                # Set x-axis ticks every 24 hours
+                ax.set_xticks(range(0, max_lag + 1, 24))
+                ax.set_xticklabels([f'{i//24}d' for i in range(0, max_lag + 1, 24)])
+                
+                # Store results
+                autocorr_results[variable] = {
+                    'acf_values': acf_values,
+                    'confint': confint,
+                    'lags': lags,
+                    'sample_size': len(data)
+                }
+                
+                # Print significant lags
+                significant_lags = []
+                for lag in range(1, min(25, len(acf_values))):  # Check first 24 hours
+                    if abs(acf_values[lag]) > 1.96/np.sqrt(len(data)):
+                        significant_lags.append(lag)
+                
+                if significant_lags:
+                    print(f"{variable}: Significant autocorrelation at lags {significant_lags} hours")
+                else:
+                    print(f"{variable}: No significant autocorrelation in first 24 hours")
+                    
+            except Exception as e:
+                print(f"Error calculating autocorrelation for {variable}: {e}")
+                ax.text(0.5, 0.5, f'Error: {str(e)}', transform=ax.transAxes, 
+                       ha='center', va='center', fontsize=10)
+        else:
+            ax.text(0.5, 0.5, f'Insufficient data\n({len(data)} points)', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=10)
+            print(f"{variable}: Insufficient data for autocorrelation ({len(data)} points)")
+    else:
+        ax_traffic.text(0.5, 0.5, f'Variable not found\n{variable}', transform=ax_traffic.transAxes, 
+                       ha='center', va='center', fontsize=10)
+    
+    # Process other variables
+    other_variables = ['aqi', 'co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
+    
+    for i, variable in enumerate(other_variables):
+        if variable in df_sorted.columns:
+            ax = axes[i]
+            
+            # Get clean data (remove NaN values)
+            data = df_sorted[variable].dropna()
+            
+            if len(data) > max_lag + 10:  # Need sufficient data for autocorrelation
+                try:
+                    # Calculate autocorrelation function - handle return values properly
+                    acf_result = acf(data, nlags=max_lag, alpha=0.05, fft=True)
+                    
+                    # Handle different return formats from acf function
+                    if isinstance(acf_result, tuple):
+                        if len(acf_result) == 2:
+                            acf_values, confint = acf_result
+                        elif len(acf_result) == 3:
+                            acf_values, confint, _ = acf_result
+                        elif len(acf_result) == 4:
+                            acf_values, confint, _, _ = acf_result
+                        else:
+                            acf_values = acf_result[0]
+                            confint = None
+                    else:
+                        acf_values = acf_result
+                        confint = None
+                    
+                    # Create lag array
+                    lags = np.arange(0, max_lag + 1)
+                    
+                    # Plot autocorrelation
+                    ax.plot(lags, acf_values, color=colors[variable], linewidth=2, label=variable)
+                    
+                    # Add confidence intervals (95%) if available
+                    if confint is not None:
+                        ax.fill_between(lags, confint[:, 0] - acf_values, confint[:, 1] - acf_values, 
+                                       alpha=0.3, color=colors[variable])
+                    
+                    # Add horizontal line at zero
+                    ax.axhline(y=0, color='black', linestyle='-', alpha=0.5)
+                    
+                    # Add significance threshold lines
+                    ax.axhline(y=1.96/np.sqrt(len(data)), color='red', linestyle='--', alpha=0.7, label='95% CI')
+                    ax.axhline(y=-1.96/np.sqrt(len(data)), color='red', linestyle='--', alpha=0.7)
+                    
+                    # Set labels and title
+                    ax.set_xlabel('Lag (hours)')
+                    ax.set_ylabel('Autocorrelation')
+                    ax.set_title(titles[variable], fontsize=12, fontweight='bold')
+                    ax.grid(True, alpha=0.3)
+                    ax.legend()
+                    
+                    # Set x-axis ticks every 24 hours
+                    ax.set_xticks(range(0, max_lag + 1, 24))
+                    ax.set_xticklabels([f'{i//24}d' for i in range(0, max_lag + 1, 24)])
+                    
+                    # Store results
+                    autocorr_results[variable] = {
+                        'acf_values': acf_values,
+                        'confint': confint,
+                        'lags': lags,
+                        'sample_size': len(data)
+                    }
+                    
+                    # Print significant lags
+                    significant_lags = []
+                    for lag in range(1, min(25, len(acf_values))):  # Check first 24 hours
+                        if abs(acf_values[lag]) > 1.96/np.sqrt(len(data)):
+                            significant_lags.append(lag)
+                    
+                    if significant_lags:
+                        print(f"{variable}: Significant autocorrelation at lags {significant_lags} hours")
+                    else:
+                        print(f"{variable}: No significant autocorrelation in first 24 hours")
+                        
+                except Exception as e:
+                    print(f"Error calculating autocorrelation for {variable}: {e}")
+                    ax.text(0.5, 0.5, f'Error: {str(e)}', transform=ax.transAxes, 
+                           ha='center', va='center', fontsize=10)
+            else:
+                ax.text(0.5, 0.5, f'Insufficient data\n({len(data)} points)', transform=ax.transAxes, 
+                       ha='center', va='center', fontsize=10)
+                print(f"{variable}: Insufficient data for autocorrelation ({len(data)} points)")
+        else:
+            ax.text(0.5, 0.5, f'Variable not found\n{variable}', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=10)
+    
+    plt.tight_layout()
+    plt.savefig(f'Graphs/station_{station_number}_autocorrelation_analysis.png', dpi=300, bbox_inches='tight')
+    print(f"Autocorrelation plot saved to: Graphs/station_{station_number}_autocorrelation_analysis.png")
+    
+    # Print summary of autocorrelation patterns
+    print(f"\nAutocorrelation Analysis Summary:")
+    print(f"  Data points analyzed: {len(df_sorted)}")
+    print(f"  Time span: {df_sorted['datetime_utc'].min()} to {df_sorted['datetime_utc'].max()}")
+    print(f"  Max lag tested: {max_lag} hours ({max_lag/24:.1f} days)")
+    
+    # Identify common patterns
+    print(f"\nCommon temporal patterns identified:")
+    
+    # Check for daily patterns (lag ~24 hours)
+    daily_patterns = []
+    for variable, results in autocorr_results.items():
+        if 'acf_values' in results:
+            # Check lag 24 (daily pattern)
+            if 24 < len(results['acf_values']):
+                daily_corr = results['acf_values'][24]
+                if abs(daily_corr) > 1.96/np.sqrt(results['sample_size']):
+                    daily_patterns.append((variable, daily_corr))
+    
+    if daily_patterns:
+        print(f"  Daily patterns (24-hour lag):")
+        for variable, corr in sorted(daily_patterns, key=lambda x: abs(x[1]), reverse=True):
+            print(f"    {variable}: r = {corr:.3f}")
+    
+    # Check for short-term patterns (lags 1-6 hours)
+    short_term_patterns = []
+    for variable, results in autocorr_results.items():
+        if 'acf_values' in results:
+            # Average of lags 1-6 hours
+            short_lags = results['acf_values'][1:7]
+            avg_short_corr = np.mean(short_lags)
+            if abs(avg_short_corr) > 1.96/np.sqrt(results['sample_size']):
+                short_term_patterns.append((variable, avg_short_corr))
+    
+    if short_term_patterns:
+        print(f"  Short-term patterns (1-6 hour average):")
+        for variable, corr in sorted(short_term_patterns, key=lambda x: abs(x[1]), reverse=True):
+            print(f"    {variable}: r = {corr:.3f}")
+    
+    print("="*80)
+    
+    return autocorr_results
+
 def main(station_number=5670):
     """
     Main function to execute the correlation analysis for a specific station
@@ -834,6 +1125,9 @@ def main(station_number=5670):
         # Save regression results to CSV
         regression_df.to_csv(f'Graphs/station_{station_number}_regression_results.csv', index=False)
         print(f"Regression results saved to: Graphs/station_{station_number}_regression_results.csv")
+        
+        # Perform autocorrelation analysis
+        autocorr_results = perform_autocorrelation_analysis(merged_df, station_number)
         
         print("\nAnalysis completed successfully!")
         

@@ -11,3 +11,4 @@ Pillow==10.1.0
 pytz==2023.3
 tqdm==4.66.1
 fiona==1.9.5
+statsmodels==0.14.0
