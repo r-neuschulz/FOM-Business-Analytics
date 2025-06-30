@@ -311,7 +311,7 @@ def perform_correlation_analysis(merged_df):
     print(f"\nNull hypothesis rejection summary:")
     print(f"  Total correlations tested: {len(correlation_df)}")
     print(f"  Null hypothesis rejected (p < 0.05): {len(significant_correlations)}")
-    print(f"  Null hypothesis not rejected (p ≥ 0.05): {len(correlation_df) - len(significant_correlations)}")
+    print(f"  Null hypothesis not rejected (p >= 0.05): {len(correlation_df) - len(significant_correlations)}")
     
     if len(significant_correlations) > 0:
         print(f"\nReasons to reject null hypothesis:")
@@ -417,8 +417,8 @@ def print_correlation_summary(correlation_df):
     # Effect size interpretation
     print(f"\nEffect Size Interpretation:")
     print(f"  Strong correlations (|r| > 0.7): {len(correlation_df[correlation_df['abs_corr'] > 0.7])}")
-    print(f"  Moderate correlations (0.3 < |r| ≤ 0.7): {len(correlation_df[(correlation_df['abs_corr'] > 0.3) & (correlation_df['abs_corr'] <= 0.7)])}")
-    print(f"  Weak correlations (|r| ≤ 0.3): {len(correlation_df[correlation_df['abs_corr'] <= 0.3])}")
+    print(f"  Moderate correlations (0.3 < |r| <= 0.7): {len(correlation_df[(correlation_df['abs_corr'] > 0.3) & (correlation_df['abs_corr'] <= 0.7)])}")
+    print(f"  Weak correlations (|r| <= 0.3): {len(correlation_df[correlation_df['abs_corr'] <= 0.3])}")
     
     print("\n" + "="*80)
 

@@ -282,8 +282,8 @@ def perform_deseasoned_correlation_analysis(merged_df_clean):
     print("Performing deseasoned correlation analysis...")
     print(f"Sample size: N = {len(merged_df_clean):,}")
     print("Note: With large sample sizes, focus on effect size (correlation magnitude) over p-values")
-    print("Adjusted thresholds: *** p<0.001, ** p<0.01, * p<0.05, ns p≥0.05")
-    print("Effect size: Strong |r|≥0.7, Moderate 0.3≤|r|<0.7, Weak 0.1≤|r|<0.3, Negligible |r|<0.1")
+    print("Adjusted thresholds: *** p<0.001, ** p<0.01, * p<0.05, ns p>=0.05")
+    print("Effect size: Strong |r|>=0.7, Moderate 0.3<=|r|<0.7, Weak 0.1<=|r|<0.3, Negligible |r|<0.1")
     
     # Focus on traffic vs pollutants correlation (deseasoned data)
     pollutant_columns = ['co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
@@ -379,9 +379,9 @@ def perform_deseasoned_correlation_analysis(merged_df_clean):
         print(f"{row['pollutant']:<8} {row['correlation']:<8.3f} {row['std_error']:<8.3f} "
               f"{ci_str:<20} {row['p_value']:<10.4f} {row['effect_size']:<10} {practical:<10}")
     
-    print("\nSignificance: *** p<0.001, ** p<0.01, * p<0.05, ns p≥0.05")
-    print("Effect Size: Strong |r|≥0.7, Moderate 0.3≤|r|<0.7, Weak 0.1≤|r|<0.3, Negligible |r|<0.1")
-    print("Practical: Minimum meaningful correlation |r|≥0.05 for N=26,000")
+    print("\nSignificance: *** p<0.001, ** p<0.01, * p<0.05, ns p>=0.05")
+    print("Effect Size: Strong |r|>=0.7, Moderate 0.3<=|r|<0.7, Weak 0.1<=|r|<0.3, Negligible |r|<0.1")
+    print("Practical: Minimum meaningful correlation |r|>=0.05 for N=26,000")
     print("Seasonality removed: Daily (hourly) + Weekly (day-of-week) patterns")
     print("="*100)
     
@@ -390,10 +390,10 @@ def perform_deseasoned_correlation_analysis(merged_df_clean):
     practical_correlations = correlation_df[correlation_df['practical_significance'].astype(bool)]
     
     print(f"\nStatistical significance (p < 0.05): {len(significant_correlations)} out of {len(correlation_df)}")
-    print(f"Practical significance (|r| ≥ 0.05): {len(practical_correlations)} out of {len(correlation_df)}")
+    print(f"Practical significance (|r| >= 0.05): {len(practical_correlations)} out of {len(correlation_df)}")
     
     if not practical_correlations.empty:
-        print("\nPractically significant correlations (|r| ≥ 0.05):")
+        print("\nPractically significant correlations (|r| >= 0.05):")
         for _, row in practical_correlations.iterrows():
             ci_str = f"[{row['ci_lower']:.3f}, {row['ci_upper']:.3f}]"
             direction = "positive" if row['correlation'] > 0 else "negative"
@@ -411,8 +411,8 @@ def perform_deseasoned_correlation_analysis(merged_df_clean):
     print(f"\nNull hypothesis rejection summary:")
     print(f"  Total correlations tested: {len(correlation_df)}")
     print(f"  Null hypothesis rejected (p < 0.05): {len(significant_correlations)}")
-    print(f"  Null hypothesis not rejected (p ≥ 0.05): {len(correlation_df) - len(significant_correlations)}")
-    print(f"  Practically meaningful (|r| ≥ 0.05): {len(practical_correlations)}")
+    print(f"  Null hypothesis not rejected (p >= 0.05): {len(correlation_df) - len(significant_correlations)}")
+    print(f"  Practically meaningful (|r| >= 0.05): {len(practical_correlations)}")
     
     if not practical_correlations.empty:
         print(f"\nKey findings for N=26,000:")
