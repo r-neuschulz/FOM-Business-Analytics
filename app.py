@@ -157,7 +157,7 @@ def main():
         ("07_DrawDownloadQuality.py", "Step 7: Creating download quality visualization", []),
         ("08_DrawTrafficVsPollution.py", "Step 8: Creating traffic vs pollution analysis", []),
         ("09_PerformAssociationCorrelationAnalysis.py", "Step 9: Performing association and correlation analysis", []),
-        ("10_DeseasonedCorrelationAnalysis.py", "Step 10: Performing deseasoned correlation analysis", [])
+        ("10_PerformDeseasonedCorrelationAnalysis.py", "Step 10: Performing deseasoned correlation analysis", [])
     ]
     
     try:
