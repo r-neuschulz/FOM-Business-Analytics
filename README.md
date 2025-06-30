@@ -74,6 +74,7 @@ This will execute the following steps:
 4. **Step 3b**: Create city-by-year stacked bar visualization
 5. **Step 3c**: Create city heatmap visualization
 6. **Step 4**: Format data for OpenWeather API (creates files with Unix timestamps and location data)
+6. **Step 6**: Download OpenWeather hourly data for pollution analysis
 
 #### Command Line Options
 
@@ -185,8 +186,8 @@ python Helpers/03_GetBastStationHourlyData.py [--test] [--workers N] [--city col
 python Helpers/04_DrawBastLocationsByCity.py
 python Helpers/05_DrawBastLocationsByCityHeatmap.py
 
-# Format data for OpenWeather API
-python Helpers/06_FormatForOpenWeather.py
+# Download OpenWeather hourly data
+python Helpers/06_GetOpenWeatherHourlyData.py
 ```
 
 #### Performance Considerations

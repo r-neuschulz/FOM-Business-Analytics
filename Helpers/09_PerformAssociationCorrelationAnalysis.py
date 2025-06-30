@@ -118,11 +118,11 @@ def convert_to_unix_end(dt):
 def process_traffic_data(traffic_df):
     """
     Process traffic data to create total traffic counts (KFZ + LKW)
-    Using the same datetime conversion logic as 06_FormatForOpenWeather.py
+    Using the same datetime conversion logic as 06_GetOpenWeatherHourlyData.py
     """
     print("Processing traffic data...")
     
-    # Create datetime column using the same logic as 06_FormatForOpenWeather.py
+    # Create datetime column using the same logic as 06_GetOpenWeatherHourlyData.py
     traffic_df['datetime'] = traffic_df.apply(
         lambda row: parse_german_date_time(row['Datum'], row['Stunde']), 
         axis=1
