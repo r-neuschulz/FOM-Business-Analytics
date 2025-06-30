@@ -1,7 +1,12 @@
 # BASt Hourly Data CSV files
 BASt Hourly Data/*
 BASt Station Files/*
+
+# OpenWeatherMap Hourly Data CSV files
 owm Hourly Data/*
+
+# Stdout captures from runs
+output*.txt
 
 # Python
 __pycache__/
