@@ -131,180 +131,101 @@ def main():
                        help='Filter stations by city coordinates (can specify multiple: cologne, berlin, duesseldorf)')
     parser.add_argument('--workers', type=int, default=10,
                        help='Number of parallel download workers (default: 10)')
+    parser.add_argument('--skip-steps', nargs='+', type=int, choices=range(0, 11),
+                       help='Skip specific steps (0-10) in the pipeline')
     
     args = parser.parse_args()
+    
+    # Define the steps to skip
+    skip_steps = set(args.skip_steps) if args.skip_steps else set()
     
     print("BASt Business Analytics Pipeline")
     print("=" * 40)
     print("Press Ctrl+C to gracefully terminate the pipeline at any time")
     print("=" * 40)
     
+    # Define all helper scripts in sequential order
+    helper_scripts = [
+        ("00_DrawBastOpenWeatherMapOverlap.py", "Step 0: Creating BASt-OpenWeatherMap overlap visualization", []),
+        ("01_GetBastStationGeneralData.py", "Step 1: Retrieving BASt coordinates", ["--fresh"] if args.fresh else []),
+        ("02_DrawBastLocations.py", "Step 2: Creating BASt locations visualization", []),
+        ("03_GetBastStationHourlyData.py", "Step 3: Downloading BASt station hourly data", 
+         (["--test"] if args.test else []) + (["--city"] + args.city) + (["--workers", str(args.workers)] if args.workers != 10 else [])),
+        ("04_DrawBastLocationsByCity.py", "Step 4: Creating city-by-year stacked bar visualization", []),
+        ("05_DrawBastLocationsByCityHeatmap.py", "Step 5: Creating city heatmap visualization", []),
+        ("06_FormatForOpenWeather.py", "Step 6: Formatting data for OpenWeather API", []),
+        ("07_DrawDownloadQuality.py", "Step 7: Creating download quality visualization", []),
+        ("08_DrawTrafficVsPollution.py", "Step 8: Creating traffic vs pollution analysis", []),
+        ("09_PerformAssociationCorrelationAnalysis.py", "Step 9: Performing association and correlation analysis", []),
+        ("10_DeseasonedCorrelationAnalysis.py", "Step 10: Performing deseasoned correlation analysis", [])
+    ]
+    
     try:
-        # Step 1: Get BASt coordinates
-        print("\nStep 1: Retrieving BASt coordinates...")
-        bast_coords_script = os.path.join("Helpers", "01_GetBastStationGeneralData.py")
-        
-        if not os.path.exists(bast_coords_script):
-            print(f"Error: {bast_coords_script} not found.")
-            return False
-        
-        # Prepare arguments for coordinate retrieval
-        coords_args = ["--fresh"] if args.fresh else []
-        
-        if not run_script(bast_coords_script, coords_args):
+        # Execute each helper script sequentially
+        for step_num, (script_name, description, script_args) in enumerate(helper_scripts):
+            # Check if this step should be skipped
+            if step_num in skip_steps:
+                print(f"\nSkipping {description} (step {step_num})")
+                continue
+            
+            # Special handling for Step 3 (hourly data download)
+            if step_num == 3 and args.skip_hourly:
+                print(f"\n{description} (skipping actual downloads, creating city mapping only)...")
+                # Run just to create city mapping, with --test to skip actual downloads
+                script_args = ["--test"] + (["--city"] + args.city)
+            elif step_num == 3:
+                print(f"\n{description}...")
+            else:
+                print(f"\n{description}...")
+            
+            script_path = os.path.join("Helpers", script_name)
+            
+            if not os.path.exists(script_path):
+                print(f"Error: {script_path} not found.")
+                if step_num in [0, 1, 2, 3]:  # Critical steps
+                    return False
+                else:
+                    print(f"Warning: Skipping step {step_num} due to missing script.")
+                    continue
+            
+            if not run_script(script_path, script_args):
+                if termination_requested:
+                    print(f"Pipeline terminated by user during {description.lower()}.")
+                    return False
+                print(f"Failed to complete {description.lower()}. Exiting.")
+                if step_num in [0, 1, 2, 3]:  # Critical steps
+                    return False
+                else:
+                    print(f"Warning: Continuing pipeline despite failure in step {step_num}.")
+                    continue
+            
+            # Check for termination request
             if termination_requested:
-                print("Pipeline terminated by user during coordinate retrieval.")
+                print(f"Pipeline terminated by user after {description.lower()}.")
                 return False
-            print("Failed to retrieve BASt coordinates. Exiting.")
-            return False
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after coordinate retrieval.")
-            return False
-        
-        # Step 2: Create visualizations
-        print("\nStep 2: Creating visualizations...")
-        viz_script = os.path.join("Helpers", "02_DrawBastLocations.py")
-        
-        if not os.path.exists(viz_script):
-            print(f"Error: {viz_script} not found.")
-            return False
-        
-        if not run_script(viz_script):
-            if termination_requested:
-                print("Pipeline terminated by user during visualization creation.")
-                return False
-            print("Failed to create visualizations. Exiting.")
-            return False
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after visualization creation.")
-            return False
-        
-        # Step 3: Download BASt station hourly data (or just create city mapping if --skip-hourly)
-        if not args.skip_hourly:
-            print("\nStep 3: Downloading BASt station hourly data...")
-            hourly_script = os.path.join("Helpers", "03_GetBastStationHourlyData.py")
-            
-            if not os.path.exists(hourly_script):
-                print(f"Error: {hourly_script} not found.")
-                return False
-            
-            # Prepare arguments for hourly data download
-            hourly_args = []
-            if args.test:
-                hourly_args.append("--test")
-            if args.city:
-                hourly_args.extend(["--city"] + args.city)
-            if args.workers != 10:
-                hourly_args.extend(["--workers", str(args.workers)])
-            
-            if not run_script(hourly_script, hourly_args):
-                if termination_requested:
-                    print("Pipeline terminated by user during hourly data download.")
-                    return False
-                print("Failed to download BASt station hourly data. Exiting.")
-                return False
-        else:
-            print("\nStep 3: Creating city mapping (skipping hourly data download)...")
-            hourly_script = os.path.join("Helpers", "03_GetBastStationHourlyData.py")
-            
-            if not os.path.exists(hourly_script):
-                print(f"Error: {hourly_script} not found.")
-                return False
-            
-            # Run just to create city mapping, with --test to skip actual downloads
-            hourly_args = ["--test"]
-            if args.city:
-                hourly_args.extend(["--city"] + args.city)
-            
-            if not run_script(hourly_script, hourly_args):
-                if termination_requested:
-                    print("Pipeline terminated by user during city mapping creation.")
-                    return False
-                print("Failed to create city mapping. Exiting.")
-                return False
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after Step 3.")
-            return False
-        
-        # Step 3b: Create city-by-year stacked bar visualization (after hourly data creates city mapping)
-        city_viz_script = os.path.join("Helpers", "04_DrawBastLocationsByCity.py")
-        if os.path.exists(city_viz_script):
-            print("\nStep 3b: Creating city-by-year stacked bar visualization...")
-            if not run_script(city_viz_script):
-                if termination_requested:
-                    print("Pipeline terminated by user during city-by-year visualization creation.")
-                    return False
-                print("Failed to create city-by-year stacked bar visualization. Exiting.")
-                return False
-        else:
-            print(f"Warning: {city_viz_script} not found. Skipping city-by-year visualization.")
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after city-by-year visualization creation.")
-            return False
-        
-        # Step 3c: Create city heatmap visualization (after hourly data creates city mapping)
-        city_heatmap_script = os.path.join("Helpers", "05_DrawBastLocationsByCityHeatmap.py")
-        if os.path.exists(city_heatmap_script):
-            print("\nStep 3c: Creating city heatmap visualization...")
-            if not run_script(city_heatmap_script):
-                if termination_requested:
-                    print("Pipeline terminated by user during city heatmap visualization creation.")
-                    return False
-                print("Failed to create city heatmap visualization. Exiting.")
-                return False
-        else:
-            print(f"Warning: {city_heatmap_script} not found. Skipping city heatmap visualization.")
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after city heatmap visualization creation.")
-            return False
-        
-        # Step 4: Format data for OpenWeather API
-        if not args.skip_hourly:
-            print("\nStep 4: Formatting data for OpenWeather API...")
-            format_script = os.path.join("Helpers", "06_FormatForOpenWeather.py")
-            
-            if not os.path.exists(format_script):
-                print(f"Error: {format_script} not found.")
-                return False
-            
-            if not run_script(format_script):
-                if termination_requested:
-                    print("Pipeline terminated by user during OpenWeather formatting.")
-                    return False
-                print("Failed to format data for OpenWeather API. Exiting.")
-                return False
-        else:
-            print("\nStep 4: Skipping OpenWeather formatting (--skip-hourly specified)")
-        
-        # Check for termination request
-        if termination_requested:
-            print("Pipeline terminated by user after OpenWeather formatting.")
-            return False
         
         print("\n" + "=" * 40)
         print("BASt Business Analytics Pipeline completed successfully!")
         if args.city:
             print(f"City filter applied: {', '.join(args.city)}")
+        if skip_steps:
+            print(f"Steps skipped: {', '.join(map(str, sorted(skip_steps)))}")
         print("\nGenerated files:")
         print("- BASt Station Files/bast_locations.csv (coordinate data)")
         print("- Graphs/bast_locations_heatmap.png (heatmap visualization)")
         print("- Graphs/bast_stations_by_year.png (year comparison)")
         print("- Graphs/bast_locations_by_year_by_city.png (city-by-year stacked bar)")
         print("- Graphs/bast_locations_by_city_heatmap.png (city heatmap visualization)")
+        print("- Graphs/bast_openweather_overlap.png (BASt-OpenWeatherMap overlap)")
+        print("- Graphs/download_quality_analysis.png (download quality visualization)")
+        print("- Graphs/traffic_vs_pollution_analysis.png (traffic vs pollution analysis)")
+        print("- Graphs/correlation_analysis_results.png (correlation analysis)")
+        print("- Graphs/deseasoned_correlation_analysis.png (deseasoned correlation analysis)")
         if not args.skip_hourly:
-            print("- BASt Hourly Data/ (extracted hourly traffic data)")
+            print("- BASt Hourly Data/zst*.csv (extracted hourly traffic data)")
             print("- BASt Hourly Data/zip_file_existence_check.csv (download status report)")
-            print("- BASt Hourly Data/*.csv (files with Unix timestamps and location data for OpenWeather API)")
+            print("- owm Hourly Data/owm*.csv (OpenWeather API downloaded hourly weather data)")
+
         
         return True
         
