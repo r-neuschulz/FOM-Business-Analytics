@@ -771,7 +771,7 @@ def perform_linear_regression_analysis(merged_df):
         for _, row in significant_regressions.iterrows():
             ci_str = f"[{row['slope_ci_lower']:.6f}, {row['slope_ci_upper']:.6f}]"
             direction = "increase" if row['slope'] > 0 else "decrease"
-            print(f"  {row['pollutant']}: {row['slope']:.6f} ± {row['slope_std_err']:.6f} per vehicle/h")
+            print(f"  {row['pollutant']}: {row['slope']:.6f} +- {row['slope_std_err']:.6f} per vehicle/h")
             print(f"    - 95% CI: {ci_str}")
             print(f"    - For each additional vehicle/h, {row['pollutant']} {direction}s by {abs(row['slope']):.6f} μg m⁻³")
             print(f"    - R² = {row['r_squared']:.4f} ({row['r_squared']*100:.1f}% of variance explained)")
