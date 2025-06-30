@@ -462,7 +462,7 @@ def create_deseasoned_correlation_visualization(correlation_matrix, station_numb
               fontsize=16, fontweight='bold', pad=20)
     plt.tight_layout()
     
-    plt.savefig('Graphs/deseasoned_traffic_air_quality_correlation_matrix.png', 
+    plt.savefig(f'Graphs/station_{station_number}_deseasoned_traffic_air_quality_correlation_matrix.png', 
                 dpi=300, bbox_inches='tight')
     
     return correlation_matrix
@@ -530,8 +530,8 @@ def create_deseasoned_scatter_plots(merged_df_clean, station_number):
                 ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('Graphs/deseasoned_traffic_vs_pollutants_scatter.png', dpi=300, bbox_inches='tight')
-    print(f'Saved: Graphs/deseasoned_traffic_vs_pollutants_scatter.png')
+    plt.savefig(f'Graphs/station_{station_number}_deseasoned_traffic_vs_pollutants_scatter.png', dpi=300, bbox_inches='tight')
+    print(f'Saved: Graphs/station_{station_number}_deseasoned_traffic_vs_pollutants_scatter.png')
 
 def analyze_deseasoned_temporal_coverage(merged_df_clean, station_number):
     """
@@ -659,8 +659,8 @@ def create_deseasoned_timeseries_overview_plot(merged_df_clean, station_number):
         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.9, edgecolor='gray')
     )
     
-    plt.savefig('Graphs/deseasoned_traffic_pollutants_timeseries_overview.png', dpi=300)
-    print(f'Saved: Graphs/deseasoned_traffic_pollutants_timeseries_overview.png')
+    plt.savefig(f'Graphs/station_{station_number}_deseasoned_traffic_pollutants_timeseries_overview.png', dpi=300)
+    print(f'Saved: Graphs/station_{station_number}_deseasoned_traffic_pollutants_timeseries_overview.png')
 
 def print_deseasoned_correlation_summary(correlation_df):
     """
@@ -700,6 +700,129 @@ def print_deseasoned_correlation_summary(correlation_df):
             print(f"  {row['pollutant']}: r = {row['correlation']:.3f}, p = {row['p_value']:.4f} {row['significance']}")
     
     print("\n" + "="*60)
+
+def perform_deseasoned_linear_regression_analysis(merged_df_clean):
+    """
+    Perform linear regression analysis between deseasoned traffic and air pollutants to get effect sizes
+    """
+    print("\n" + "="*120)
+    print("LINEAR REGRESSION ANALYSIS: DESEASONED TRAFFIC VS POLLUTANTS")
+    print("="*120)
+    
+    # Focus on deseasoned traffic vs deseasoned pollutants regression
+    pollutant_columns = ['co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
+    
+    # Calculate regression for each pollutant
+    regression_data = []
+    
+    for pollutant in pollutant_columns:
+        deseasoned_pollutant = f'{pollutant}_deseasoned'
+        if deseasoned_pollutant in merged_df_clean.columns:
+            # Remove NaN values for this specific pollutant
+            mask = ~(merged_df_clean['total_traffic_deseasoned'].isna() | merged_df_clean[deseasoned_pollutant].isna())
+            traffic_clean = merged_df_clean['total_traffic_deseasoned'][mask]
+            pollutant_clean = merged_df_clean[deseasoned_pollutant][mask]
+            
+            if len(traffic_clean) > 2:  # Need at least 3 points for regression
+                try:
+                    # Perform linear regression
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(traffic_clean, pollutant_clean)
+                    r_squared = float(r_value) ** 2 # type: ignore
+                    
+                    # Calculate confidence intervals for slope
+                    # Degrees of freedom
+                    df = len(traffic_clean) - 2
+                    
+                    # t-critical value for 95% confidence interval
+                    t_critical = stats.t.ppf(0.975, df)
+                    
+                    # Confidence interval for slope
+                    slope_ci_lower = float(slope) - t_critical * float(std_err) #type: ignore
+                    slope_ci_upper = float(slope) + t_critical * float(std_err) #type: ignore
+                    
+                    # Calculate predicted values for R-squared interpretation
+                    predicted = slope * traffic_clean + intercept
+                    
+                    # Calculate mean values for context
+                    traffic_mean = traffic_clean.mean()
+                    pollutant_mean = pollutant_clean.mean()
+                    
+                    # Determine significance
+                    if float(p_value) < 0.001: #type: ignore
+                        significance = "***"
+                    elif float(p_value) < 0.01: #type: ignore
+                        significance = "**"
+                    elif float(p_value) < 0.05: #type: ignore
+                        significance = "*"
+                    else:
+                        significance = "ns"
+                    
+                    regression_data.append({
+                        'pollutant': pollutant,
+                        'slope': float(slope), #type: ignore
+                        'slope_std_err': float(std_err), #type: ignore
+                        'slope_ci_lower': slope_ci_lower,
+                        'slope_ci_upper': slope_ci_upper,
+                        'intercept': float(intercept), #type: ignore
+                        'r_squared': r_squared,
+                        'p_value': float(p_value), #type: ignore
+                        'significance': significance,
+                        'sample_size': len(traffic_clean),
+                        'traffic_mean': traffic_mean,
+                        'pollutant_mean': pollutant_mean
+                    })
+                    
+                except (ValueError, RuntimeWarning):
+                    # Skip if regression calculation fails
+                    continue
+    
+    regression_df = pd.DataFrame(regression_data)
+    regression_df = regression_df.sort_values('r_squared', ascending=False)
+    
+    # Print results
+    print(f"{'Pollutant':<8} {'Slope':<12} {'SE':<10} {'95% CI':<25} {'R²':<8} {'p-value':<10} {'Sig':<4} {'Pollutant Mean':<15} {'Traffic Mean':<15}")
+    print("-" * 120)
+    
+    for _, row in regression_df.iterrows():
+        ci_str = f"[{row['slope_ci_lower']:.6f}, {row['slope_ci_upper']:.6f}]"
+        
+        print(f"{row['pollutant']:<8} {row['slope']:<12.6f} {row['slope_std_err']:<10.6f} "
+              f"{ci_str:<25} {row['r_squared']:<8.4f} {row['p_value']:<10.4f} {row['significance']:<4} "
+              f"{row['pollutant_mean']:<15.3f} {row['traffic_mean']:<15.1f}")
+    
+    print("\nSlope = Change in deseasoned pollutant per additional deseasoned vehicle per hour")
+    print("SE = Standard Error of the slope")
+    print("95% CI = 95% Confidence Interval for the slope")
+    print("R² = Proportion of variance explained by deseasoned traffic")
+    print("Significance: *** p<0.001, ** p<0.01, * p<0.05, ns not significant")
+    print("Pollutant Mean = Average deseasoned concentration in μg m⁻³")
+    print("Traffic Mean = Average deseasoned vehicles per hour")
+    print("="*120)
+    
+    # Summary of significant regressions
+    significant_regressions = regression_df[regression_df['p_value'] < 0.05]
+    print(f"\nSignificant regressions (p < 0.05): {len(significant_regressions)} out of {len(regression_df)}")
+    
+    if len(significant_regressions) > 0:
+        print("Significant regressions with effect sizes:")
+        for _, row in significant_regressions.iterrows():
+            ci_str = f"[{row['slope_ci_lower']:.6f}, {row['slope_ci_upper']:.6f}]"
+            direction = "increase" if row['slope'] > 0 else "decrease"
+            print(f"  {row['pollutant']}: {row['slope']:.6f} ± {row['slope_std_err']:.6f} per deseasoned vehicle/h")
+            print(f"    - 95% CI: {ci_str}")
+            print(f"    - For each additional deseasoned vehicle/h, {row['pollutant']} {direction}s by {abs(row['slope']):.6f} μg m⁻³")
+            print(f"    - R² = {row['r_squared']:.4f} ({row['r_squared']*100:.1f}% of variance explained)")
+            print(f"    - p = {row['p_value']:.4f} {row['significance']}")
+    
+    # Practical interpretation
+    print(f"\nPractical Interpretation:")
+    print(f"  Deseasoned traffic levels: Mean = {regression_df['traffic_mean'].iloc[0]:.1f} vehicles/h")
+    print(f"  Slopes show the change in deseasoned pollutant concentration per additional deseasoned vehicle per hour")
+    print(f"  Positive slopes: deseasoned pollutant increases with deseasoned traffic")
+    print(f"  Negative slopes: deseasoned pollutant decreases with deseasoned traffic (may indicate dilution or other factors)")
+    print(f"  Note: Seasonal patterns have been removed from both traffic and pollutant data")
+    
+    return regression_df
 
 def main():
     """
@@ -758,11 +881,11 @@ def main():
     print_deseasoned_correlation_summary(correlation_df)
     
     # Save results
-    correlation_df_full.to_csv('Graphs/deseasoned_correlation_matrix.csv')
-    print(f"\nDeseasoned correlation matrix saved to: Graphs/deseasoned_correlation_matrix.csv")
+    correlation_df_full.to_csv(f'Graphs/station_{args.station}_deseasoned_correlation_matrix.csv')
+    print(f"\nDeseasoned correlation matrix saved to: Graphs/station_{args.station}_deseasoned_correlation_matrix.csv")
     
-    merged_df_clean.to_csv('Graphs/deseasoned_merged_data.csv', index=False)
-    print(f"Deseasoned merged dataset saved to: Graphs/deseasoned_merged_data.csv")
+    merged_df_clean.to_csv(f'Graphs/station_{args.station}_deseasoned_merged_data.csv', index=False)
+    print(f"Deseasoned merged dataset saved to: Graphs/station_{args.station}_deseasoned_merged_data.csv")
     
     # Print final summary
     print("\n=== ENHANCED DESEASONED CORRELATION ANALYSIS SUMMARY ===")
@@ -772,6 +895,13 @@ def main():
     print("Seasonality removed: Daily (hourly) patterns + Weekly (day-of-week) patterns")
     print("\nPearson correlation matrix (deseasoned data):")
     print(correlation_df_full)
+    
+    # Perform linear regression analysis
+    regression_df = perform_deseasoned_linear_regression_analysis(merged_df_clean)
+    
+    # Save regression results to CSV
+    regression_df.to_csv(f'Graphs/station_{args.station}_deseasoned_regression_results.csv', index=False)
+    print(f"Deseasoned regression results saved to: Graphs/station_{args.station}_deseasoned_regression_results.csv")
     
     print("\nAnalysis completed successfully!")
 

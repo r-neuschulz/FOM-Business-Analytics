@@ -363,7 +363,7 @@ def create_correlation_visualization(correlation_matrix):
               fontsize=16, fontweight='bold', pad=20)
     plt.tight_layout()
     
-    plt.savefig('Graphs/traffic_air_quality_correlation_matrix.png', 
+    plt.savefig(f'Graphs/station_{station_number}_traffic_air_quality_correlation_matrix.png', 
                 dpi=300, bbox_inches='tight')
     
     return correlation_matrix
@@ -525,7 +525,7 @@ def create_scatter_plots(merged_df):
         
     
     plt.tight_layout()
-    plt.savefig('Graphs/traffic_vs_pollutants_scatter.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'Graphs/station_{station_number}_traffic_vs_pollutants_scatter.png', dpi=300, bbox_inches='tight')
 
 def analyze_temporal_coverage(merged_df):
     """
@@ -659,8 +659,8 @@ def create_timeseries_overview_plot(merged_df, station_number):
         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.9, edgecolor='gray')
     )
     
-    plt.savefig('Graphs/traffic_pollutants_timeseries_overview.png', dpi=300)
-    print('Saved: Graphs/traffic_pollutants_timeseries_overview.png')
+    plt.savefig(f'Graphs/station_{station_number}_traffic_pollutants_timeseries_overview.png', dpi=300)
+    print(f'Saved: Graphs/station_{station_number}_traffic_pollutants_timeseries_overview.png')
 
 def perform_linear_regression_analysis(merged_df):
     """
