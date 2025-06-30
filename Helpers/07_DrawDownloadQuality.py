@@ -112,9 +112,6 @@ def create_download_quality_plot(file_counts):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Download quality analysis plot saved to: {output_path}")
     
-    # Show the plot
-    plt.show()
-    
     return fig
 
 def print_summary_statistics(file_counts):
