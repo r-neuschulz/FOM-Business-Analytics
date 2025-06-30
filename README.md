@@ -29,7 +29,6 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
 1. Visit [OpenWeatherMap API Keys](https://home.openweathermap.org/api_keys)
 2. Create an account or sign in
 3. Generate a new API key
-4. Add the API key to the `.env` file in the project root
 
 ### Setup Instructions
 
@@ -38,7 +37,6 @@ To verify the downloaded OpenWeatherMap data, an API key is required. To obtain 
    ```bash
    pip install -r requirements.txt
    ```
-3. Configure your `.env` file with your OpenWeatherMap API key
 
 ### Running the Complete Analytics Pipeline
 
@@ -78,7 +76,7 @@ The pipeline executes the following 11 steps in sequence:
 To run the complete analytics pipeline:
 
 ```bash
-python app.py
+python app.py --api-key YOUR_API_KEY_HERE
 ```
 
 This will execute all 11 steps sequentially, providing comprehensive analysis of traffic-pollution correlations.
@@ -88,29 +86,32 @@ This will execute all 11 steps sequentially, providing comprehensive analysis of
 The pipeline supports command line options for different use cases:
 
 ```bash
+# Basic usage with API key (required)
+python app.py --api-key YOUR_API_KEY_HERE
+
 # Force fresh data retrieval for coordinates
-python app.py --fresh
+python app.py --api-key YOUR_API_KEY_HERE --fresh
 
 # Run in test mode (limited URLs for testing)
-python app.py --test
+python app.py --api-key YOUR_API_KEY_HERE --test
 
 # Skip hourly data download (only creates city mapping and visualizations)
-python app.py --skip-hourly
+python app.py --api-key YOUR_API_KEY_HERE --skip-hourly
 
 # Filter by specific cities (can specify multiple)
-python app.py --city cologne berlin
-python app.py --city berlin
-python app.py --city cologne berlin duesseldorf
+python app.py --api-key YOUR_API_KEY_HERE --city cologne berlin
+python app.py --api-key YOUR_API_KEY_HERE --city berlin
+python app.py --api-key YOUR_API_KEY_HERE --city cologne berlin duesseldorf
 
 # Customize parallel processing
-python app.py --workers 20
+python app.py --api-key YOUR_API_KEY_HERE --workers 20
 
 # Skip specific steps (0-10)
-python app.py --skip-steps 6 7 8 9 10  # Skip OpenWeather and analysis steps
-python app.py --skip-steps 0 4 5       # Skip visualization steps
+python app.py --api-key YOUR_API_KEY_HERE --skip-steps 6 7 8 9 10  # Skip OpenWeather and analysis steps
+python app.py --api-key YOUR_API_KEY_HERE --skip-steps 0 4 5       # Skip visualization steps
 
 # Combine options
-python app.py --fresh --test --workers 15 --city cologne berlin --skip-steps 6 7 8 9 10
+python app.py --api-key YOUR_API_KEY_HERE --fresh --test --workers 15 --city cologne berlin --skip-steps 6 7 8 9 10
 ```
 
 #### Available Cities
@@ -127,7 +128,7 @@ Default behavior includes all three cities: `cologne`, `berlin`, `duesseldorf`
 For testing or development purposes, use the `--test` flag:
 
 ```bash
-python app.py --test
+python app.py --api-key YOUR_API_KEY_HERE --test
 ```
 
 This will:
@@ -140,7 +141,7 @@ This will:
 Use the `--skip-hourly` flag to run the pipeline without downloading hourly data:
 
 ```bash
-python app.py --skip-hourly
+python app.py --api-key YOUR_API_KEY_HERE --skip-hourly
 ```
 
 This will:
@@ -155,23 +156,23 @@ Use the `--skip-steps` option to skip specific pipeline steps:
 
 ```bash
 # Skip OpenWeather data download and analysis steps
-python app.py --skip-steps 6 7 8 9 10
+python app.py --api-key YOUR_API_KEY_HERE --skip-steps 6 7 8 9 10
 
 # Skip only visualization steps
-python app.py --skip-steps 0 2 4 5
+python app.py --api-key YOUR_API_KEY_HERE --skip-steps 0 2 4 5
 
 # Skip correlation analysis steps
-python app.py --skip-steps 9 10
+python app.py --api-key YOUR_API_KEY_HERE --skip-steps 9 10
 ```
 
 #### Parallel Processing
 
 ```bash
 # Conservative approach (fewer workers, usually more respectful towards providing servers)
-python app.py --workers 5
+python app.py --api-key YOUR_API_KEY_HERE --workers 5
 
 # Aggressive approach (more workers, faster downloads)
-python app.py --workers 20
+python app.py --api-key YOUR_API_KEY_HERE --workers 20
 ```
 
 #### Graceful Termination
@@ -222,8 +223,8 @@ python Helpers/03_GetBastStationHourlyData.py [--test] [--workers N] [--city col
 python Helpers/04_DrawBastLocationsByCity.py
 python Helpers/05_DrawBastLocationsByCityHeatmap.py
 
-# Step 6: Download OpenWeather hourly data
-python Helpers/06_GetOpenWeatherHourlyData.py
+# Step 6: Download OpenWeather hourly data (requires API key)
+python Helpers/06_GetOpenWeatherHourlyData.py --api-key YOUR_API_KEY_HERE
 
 # Step 7: Create download quality visualization
 python Helpers/07_DrawDownloadQuality.py

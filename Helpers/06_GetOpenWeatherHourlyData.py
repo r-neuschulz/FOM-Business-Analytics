@@ -12,6 +12,7 @@ aqi, components, and dt values to new CSVs in 'owm Hourly Data/'.
 import requests
 import pandas as pd
 import os
+import argparse
 from datetime import datetime, timedelta
 import pytz
 from tqdm import tqdm
@@ -66,6 +67,11 @@ def get_openweather_air_pollution_data(lat, lon, start_time, end_time, api_key):
     return response.json()
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Download OpenWeatherMap hourly pollution data for BASt stations')
+    parser.add_argument('--api-key', required=True, help='OpenWeatherMap API key (required)')
+    args = parser.parse_args()
+    
     # Set up directories and file lists
     data_dir = "BASt Hourly Data"
     csv_files = [f for f in sorted(os.listdir(data_dir)) if f.startswith('zst') and f.endswith('.csv')]
@@ -79,7 +85,7 @@ def main():
         return
     stations_file = os.path.join(data_dir, "bast_stations_by_city.csv")
     stations_df = pd.read_csv(stations_file)
-    api_key = "489eb9ae90ccd3a36e081f88e281293f"
+    api_key = args.api_key
     out_dir = "owm Hourly Data"
     os.makedirs(out_dir, exist_ok=True)
     success_count = 0

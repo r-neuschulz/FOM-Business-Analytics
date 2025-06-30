@@ -120,6 +120,7 @@ def main():
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='BASt Business Analytics Pipeline')
+    parser.add_argument('--api-key', required=True, help='OpenWeatherMap API key (required)')
     parser.add_argument('--fresh', action='store_true', 
                        help='Force fresh data retrieval for coordinates')
     parser.add_argument('--test', action='store_true', 
@@ -153,7 +154,7 @@ def main():
          (["--test"] if args.test else []) + (["--city"] + args.city) + (["--workers", str(args.workers)] if args.workers != 10 else [])),
         ("04_DrawBastLocationsByCity.py", "Step 4: Creating city-by-year stacked bar visualization", []),
         ("05_DrawBastLocationsByCityHeatmap.py", "Step 5: Creating city heatmap visualization", []),
-        ("06_GetOpenWeatherHourlyData.py", "Step 6: Downloading OpenWeather hourly data", []),
+        ("06_GetOpenWeatherHourlyData.py", "Step 6: Downloading OpenWeather hourly data", ["--api-key", args.api_key]),
         ("07_DrawDownloadQuality.py", "Step 7: Creating download quality visualization", []),
         ("08_DrawTrafficVsPollution.py", "Step 8: Creating traffic vs pollution analysis", []),
         ("09_PerformAssociationCorrelationAnalysis.py", "Step 9: Performing association and correlation analysis", []),
