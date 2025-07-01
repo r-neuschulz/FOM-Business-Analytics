@@ -11,12 +11,13 @@ We're correlating pollution data from OpenWeatherMap with traffic data from BASt
 - **Course**: Business Analytics
 - **Academic Year**: 2025
 - **Project Type**: Semester Project
+- **Authors**: Richard Neuschulz and Björn Kerneker
 
 ## Contents
-- Script for reference
-- Instructions on how to run the BA Scripts
-- Pre-generated Plots
-- Documentation and findings
+- Scripts for reference (01 to 10) 
+- Instructions on how to run the BA Scripts (`README.md`, this file)
+- Pre-generated Plots (everything in Graphs)
+- Documentation and findings (`Presentation in Material/PP_Business_Analytics.pdf`)
 
 ## Getting Started
 
@@ -242,7 +243,7 @@ python Helpers/10_PerformDeseasonedCorrelationAnalysis.py
 #### Performance Considerations
 
 For downloading the full dataset (35,000+ files):
-- **Estimated time**: ~2-4 hours with 10 workers (vs ~20 hours sequential)
+- **Estimated time**: ~1-2 hours with 10 worker processes
 - **Monitoring**: Watch for 429 errors (rate limiting)
 - **Resume capability**: Script skips already downloaded files
 
