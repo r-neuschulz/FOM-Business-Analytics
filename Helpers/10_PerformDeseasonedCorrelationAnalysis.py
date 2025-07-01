@@ -473,14 +473,15 @@ def create_deseasoned_scatter_plots(merged_df_clean, station_number):
     """
     print("Creating deseasoned scatter plots...")
     
-    # Define pollutants in the requested 3x3 grid order
-    pollutants = ['co', 'no', 'no2', 'o3', 'so2', 'pm2_5', 'pm10', 'nh3']
-    titles = ['Carbon Monoxide (CO)', 'Nitric Oxide (NO)', 'Nitrogen Dioxide (NO₂)', 
-              'Ozone (O₃)', 'Sulfur Dioxide (SO₂)', 'Fine Particulate Matter (PM2.5)', 
-              'Coarse Particulate Matter (PM10)', 'Ammonia (NH₃)']
+    # Define pollutants in the requested 3x3 grid order (matching baseline 09 file)
+    pollutants = ['aqi', 'no', 'co', 'pm2_5', 'no2', 'o3', 'pm10', 'nh3', 'so2']
+    titles = ['Air Quality Index (AQI)', 'Nitric Oxide (NO)', 'Carbon Monoxide (CO)', 'Fine Particulate Matter (PM2.5)', 
+              'Nitrogen Dioxide (NO₂)', 'Ozone (O₃)', 'Coarse Particulate Matter (PM10)', 
+              'Ammonia (NH₃)', 'Sulfur Dioxide (SO₂)']
     
     # Define colors for each pollutant
     colors = {
+        'aqi': 'white',     # Empty field for AQI (composite index, no deseasoning needed)
         'pm2_5': 'grey',
         'pm10': '#404040',  # Dark grey
         'no': '#D2B48C',    # Light brown
@@ -495,9 +496,19 @@ def create_deseasoned_scatter_plots(merged_df_clean, station_number):
     axes = axes.flatten()
     
     for i, (pollutant, title) in enumerate(zip(pollutants, titles)):
-        if pollutant in merged_df_clean.columns:
-            ax = axes[i]
-            
+        ax = axes[i]
+        
+        if pollutant == 'aqi':
+            # AQI is a composite index, no deseasoning needed - create empty white field
+            ax.set_facecolor('white')
+            ax.text(0.5, 0.5, 'AQI is discrete,\nno deseasoning\napplicable', 
+                   transform=ax.transAxes, ha='center', va='center', 
+                   fontsize=12, fontweight='bold', color='gray')
+            ax.set_title('Air Quality Index (AQI)', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Deseasoned Traffic / vehicles h⁻¹')
+            ax.set_ylabel('AQI / 1')
+            ax.grid(True, alpha=0.3)
+        elif pollutant in merged_df_clean.columns:
             x = merged_df_clean['total_traffic_deseasoned']
             y = merged_df_clean[f'{pollutant}_deseasoned']
             
