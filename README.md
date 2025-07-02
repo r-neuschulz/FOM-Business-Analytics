@@ -59,18 +59,17 @@ The main application (`app.py`) provides a comprehensive 11-step pipeline for re
 #### Complete Pipeline Steps
 
 The pipeline executes the following 11 steps in sequence:
-
-1. **Step 0**: Create BASt-OpenWeatherMap overlap visualization
-2. **Step 1**: Retrieve BASt traffic counting station coordinates from 2003-2023
-3. **Step 2**: Generate BASt locations visualizations (heatmap, year comparison)
-4. **Step 3**: Download and extract hourly traffic data from BASt servers
-5. **Step 4**: Create city-by-year stacked bar visualization
-6. **Step 5**: Create city heatmap visualization
-7. **Step 6**: Download OpenWeather hourly pollution data
-8. **Step 7**: Create download quality visualization
-9. **Step 8**: Create traffic vs pollution analysis
-10. **Step 9**: Perform association and correlation analysis
-11. **Step 10**: Perform deseasoned correlation analysis
+- **Step 0**: Create BASt-OpenWeatherMap overlap visualization
+- **Step 1**: Retrieve BASt traffic counting station coordinates from 2003-2023
+- **Step 2**: Generate BASt locations visualizations (heatmap, year comparison)
+- **Step 3**: Download and extract hourly traffic data from BASt servers
+- **Step 4**: Create city-by-year stacked bar visualization
+- **Step 5**: Create city heatmap visualization
+- **Step 6**: Download OpenWeather hourly pollution data
+- **Step 7**: Create download quality visualization
+- **Step 8**: Create traffic vs pollution analysis
+- **Step 9**: Perform association and correlation analysis
+- **Step 10**: Perform deseasoned correlation analysis
 
 #### Basic Usage
 
